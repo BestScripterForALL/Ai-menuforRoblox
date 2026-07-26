@@ -1,23 +1,22 @@
--- Neverlose UI Framework for Roblox (Mobile/Executor Compatible)
--- Target Format: .txt / Script File
+-- Neverlose UI Framework for Roblox (Fixed for Injectors)
 
 local Players = game:GetService("Players")
-local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui") or CoreGui
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- Удаляем старое меню, если оно уже запущено
-if CoreGui:FindFirstChild("NeverloseMenu") then
-    CoreGui.NeverloseMenu:Destroy()
+if PlayerGui:FindFirstChild("NeverloseMenu") then
+    PlayerGui.NeverloseMenu:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "NeverloseMenu"
-ScreenGui.Parent = CoreGui
+ScreenGui.Parent = PlayerGui
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.ResetOnSpawn = false
 
 -- Главное окно меню
 local MainFrame = Instance.new("Frame")
@@ -32,7 +31,7 @@ local MainCorner = Instance.new("UICorner")
 MainCorner.CornerRadius = UDim.new(0, 6)
 MainCorner.Parent = MainFrame
 
--- Шапка меню (Drag & Drop для мобильных/ПК)
+-- Шапка меню (Drag & Drop)
 local TopBar = Instance.new("Frame")
 TopBar.Parent = MainFrame
 TopBar.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
@@ -49,13 +48,12 @@ Title.BackgroundTransparency = 1
 Title.Position = UDim2.new(0, 15, 0, 0)
 Title.Size = UDim2.new(0, 200, 1, 0)
 Title.Font = Enum.Font.GothamBold
-Title.Text = "neverlose.cc <font color='#7c3aed'>[preview]</font>"
-Title.RichText = true
+Title.Text = "neverlose.cc [preview]"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
 
--- Контейнер для вкладок (Tabs Header)
+-- Контейнер для вкладок
 local TabContainer = Instance.new("Frame")
 TabContainer.Parent = MainFrame
 TabContainer.BackgroundTransparency = 1
@@ -79,7 +77,6 @@ local Tabs = {}
 local Pages = {}
 
 local function CreateTab(name, index)
-    -- Кнопка вкладки
     local TabButton = Instance.new("TextButton")
     TabButton.Parent = TabContainer
     TabButton.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
@@ -95,7 +92,6 @@ local function CreateTab(name, index)
     BtnCorner.CornerRadius = UDim.new(0, 4)
     BtnCorner.Parent = TabButton
 
-    -- Страница вкладки
     local Page = Instance.new("ScrollingFrame")
     Page.Name = name .. "Page"
     Page.Parent = ContentContainer
@@ -104,6 +100,7 @@ local function CreateTab(name, index)
     Page.Size = UDim2.new(1, 0, 1, 0)
     Page.Visible = (index == 1)
     Page.CanvasSize = UDim2.new(0, 0, 0, 0)
+    Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
     Page.ScrollBarThickness = 3
     Page.ScrollBarImageColor3 = Color3.fromRGB(124, 58, 237)
 
@@ -120,7 +117,7 @@ local function CreateTab(name, index)
             TweenService:Create(t, TweenInfo.new(0.2), {
                 BackgroundColor3 = Color3.fromRGB(25, 25, 35),
                 TextColor3 = Color3.fromRGB(130, 130, 145)
-            }:Play()
+            }):Play()
         end
         Page.Visible = true
         TweenService:Create(TabButton, TweenInfo.new(0.2), {
@@ -192,10 +189,8 @@ local function AddToggle(parent, title, defaultState, callback)
     end)
 end
 
--- Функция создания слайдера (упрощенная для стабильности на мобильных)
+-- Функция создания слайдера
 local function AddSlider(parent, title, min, max, default, callback)
-    local value = default
-
     local SliderFrame = Instance.new("Frame")
     SliderFrame.Parent = parent
     SliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
@@ -281,29 +276,26 @@ local function AddSlider(parent, title, min, max, default, callback)
     end)
 end
 
--- Заполнение вкладки Aimbot
+-- Наполнение элементов
 AddToggle(AimbotPage, "Enable Aimbot", true, function(v) print("Aimbot:", v) end)
 AddToggle(AimbotPage, "Auto Shoot", false, function(v) print("Auto Shoot:", v) end)
 AddToggle(AimbotPage, "Silent Aim", false, function(v) print("Silent Aim:", v) end)
 AddSlider(AimbotPage, "Field of View", 1, 30, 5, function(v) print("FOV:", v) end)
 AddSlider(AimbotPage, "Smoothing", 1, 100, 15, function(v) print("Smoothing:", v) end)
 
--- Заполнение вкладки Visuals
 AddToggle(VisualsPage, "Enable ESP", true, function(v) print("ESP:", v) end)
 AddToggle(VisualsPage, "Box Outline", true, function(v) print("Box:", v) end)
 AddToggle(VisualsPage, "Health Bar", true, function(v) print("Health:", v) end)
 AddSlider(VisualsPage, "Max Distance", 50, 500, 250, function(v) print("Distance:", v) end)
 
--- Заполнение вкладки Skins
 AddToggle(SkinsPage, "Override Skins", false, function(v) print("Skins:", v) end)
 AddSlider(SkinsPage, "Wear Value", 0, 100, 0, function(v) print("Wear:", v) end)
 
--- Заполнение вкладки Misc
 AddToggle(MiscPage, "Watermark", true, function(v) print("Watermark:", v) end)
 AddToggle(MiscPage, "Keybind List", true, function(v) print("Keybinds:", v) end)
 AddSlider(MiscPage, "Menu Scale", 50, 150, 100, function(v) print("Scale:", v) end)
 
--- Перетаскивание всего окна (Dragging)
+-- Перетаскивание окна (Dragging)
 local draggingWindow, dragInput, dragStart, startPos
 
 TopBar.InputBegan:Connect(function(input)

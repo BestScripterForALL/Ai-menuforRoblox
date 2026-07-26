@@ -1,206 +1,256 @@
--- // Сервисы
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
-local CoreGui = game:GetService("CoreGui")
-
-local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
-
--- // Переменные для сбора логов
-local capturedLogs = {}
-local isRecording = true
-
--- // Настройки фильтров (что отсекать, а что записывать)
-local Filters = {
-    IgnoreCamera = false,  -- Отсекать повороты камеры
-    IgnoreMovement = false,-- Отсекать передвижение (позицию)
-    IgnoreScripts = false, -- Отсекать вызовы/активность скриптов
-    IgnoreMouse = false    -- Отсекать клики/стрельбу
-}
-
--- Удаляем старый интерфейс, если он уже был запущен
-if CoreGui:FindFirstChild("LiteSpyUI") then
-    CoreGui.LiteSpyUI:Destroy()
+-- // Проверка на повторный запуск
+if game:GetService("CoreGui"):FindFirstChild("LiteSpy_MultiMethod") then
+    game:GetService("CoreGui").LiteSpy_MultiMethod:Destroy()
 end
 
--- // Создание GUI (Mobile Friendly & Draggable)
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "LiteSpyUI"
-ScreenGui.Parent = CoreGui
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+-- // Сервисы
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local Workspace = game:GetService("Workspace")
 
--- Главное окно меню
+local LocalPlayer = Players.LocalPlayer
+
+-- // Состояние
+local capturedLogs = {}
+local isRecording = false
+local currentMethod = "Workspace" -- По умолчанию
+
+-- // Создание GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "LiteSpy_MultiMethod"
+ScreenGui.ResetOnSpawn = false
+
+pcall(function()
+    ScreenGui.Parent = CoreGui
+end)
+if not ScreenGui.Parent then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+-- Главная панель
 local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 320, 0, 420)
 MainFrame.Position = UDim2.new(0.5, -160, 0.5, -210)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
-MainFrame.Draggable = true -- Перетаскивание пальцем/мышкой
+MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 12)
-UICorner.Parent = MainFrame
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
 
--- Верхняя панель (Заголовок)
+-- Шапка
 local TopBar = Instance.new("Frame")
-TopBar.Size = UDim2.new(1, 0, 0, 40)
+TopBar.Size = UDim2.new(1, 0, 0, 35)
 TopBar.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 TopBar.BorderSizePixel = 0
 TopBar.Parent = MainFrame
 
-local TopBarCorner = Instance.new("UICorner")
-TopBarCorner.CornerRadius = UDim.new(0, 12)
-TopBarCorner.Parent = TopBar
+local TopCorner = Instance.new("UICorner")
+TopCorner.CornerRadius = UDim.new(0, 10)
+TopCorner.Parent = TopBar
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -50, 1, 0)
-Title.Position = UDim2.new(0, 15, 0, 0)
+Title.Size = UDim2.new(1, -40, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Lite Spy | Place: " .. game.PlaceId
+Title.Text = "Lite Spy | Client Methods"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 14
-Title.Font = Enum.Font.GothamBold
+Title.TextSize = 13
+Title.Font = Enum.Font.SourceSansBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
--- Кнопка сворачивания (сверху)
+-- Кнопка сворачивания (-)
 local MinimizeBtn = Instance.new("TextButton")
-MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-MinimizeBtn.Position = UDim2.new(1, -35, 0, 5)
-MinimizeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+MinimizeBtn.Size = UDim2.new(0, 25, 0, 25)
+MinimizeBtn.Position = UDim2.new(1, -30, 0, 5)
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
 MinimizeBtn.Text = "-"
 MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 MinimizeBtn.TextSize = 18
-MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.Font = Enum.Font.SourceSansBold
 MinimizeBtn.Parent = TopBar
 
 local MinCorner = Instance.new("UICorner")
-MinCorner.CornerRadius = UDim.new(0, 6)
+MinCorner.CornerRadius = UDim.new(0, 5)
 MinCorner.Parent = MinimizeBtn
 
--- Плавающая кнопка-кружок с буквой "S" (когда меню свернуто)
+-- Плавающая кнопка "S"
 local FloatButton = Instance.new("TextButton")
 FloatButton.Name = "FloatButton"
-FloatButton.Size = UDim2.new(0, 50, 0, 50)
-FloatButton.Position = UDim2.new(0, 20, 0.2, 0)
-FloatButton.BackgroundColor3 = Color3.fromRGB(40, 120, 255)
+FloatButton.Size = UDim2.new(0, 45, 0, 45)
+FloatButton.Position = UDim2.new(0, 15, 0.3, 0)
+FloatButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
 FloatButton.Text = "S"
 FloatButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 FloatButton.TextSize = 22
-FloatButton.Font = Enum.Font.GothamBold
+FloatButton.Font = Enum.Font.SourceSansBold
 FloatButton.Visible = false
 FloatButton.Active = true
 FloatButton.Draggable = true
 FloatButton.Parent = ScreenGui
 
 local FloatCorner = Instance.new("UICorner")
-FloatCorner.CornerRadius = UDim.new(1, 0) -- Делает круглым
+FloatCorner.CornerRadius = UDim.new(1, 0)
 FloatCorner.Parent = FloatButton
 
--- Контейнер для настроек и кнопок
-local ContentContainer = Instance.new("ScrollingFrame")
-ContentContainer.Size = UDim2.new(1, -20, 1, -110)
-ContentContainer.Position = UDim2.new(0, 10, 0, 50)
-ContentContainer.BackgroundTransparency = 1
-ContentContainer.CanvasSize = UDim2.new(0, 0, 0, 300)
-ContentContainer.ScrollBarThickness = 4
-ContentContainer.Parent = MainFrame
+-- Контейнер для контента
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, -20, 1, -50)
+Content.Position = UDim2.new(0, 10, 0, 45)
+Content.BackgroundTransparency = 1
+Content.Parent = MainFrame
 
-local UIListLayout = Instance.new("UIListLayout")
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Padding = UDim.new(0, 10)
-UIListLayout.Parent = ContentContainer
+-- Выбор метода (Табы / Кнопки переключения)
+local MethodLabel = Instance.new("TextLabel")
+MethodLabel.Size = UDim2.new(1, 0, 0, 20)
+MethodLabel.BackgroundTransparency = 1
+MethodLabel.Text = "Выберите метод анализа:"
+MethodLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+MethodLabel.TextSize = 12
+MethodLabel.Font = Enum.Font.SourceSansBold
+MethodLabel.Parent = Content
 
--- Функция создания красивых переключателей (Toggle)
-local function CreateToggle(name, defaultState, callback)
-    local ToggleFrame = Instance.new("Frame")
-    ToggleFrame.Size = UDim2.new(1, 0, 0, 40)
-    ToggleFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
-    ToggleFrame.BorderSizePixel = 0
-    ToggleFrame.Parent = ContentContainer
+local MethodBtn = Instance.new("TextButton")
+MethodBtn.Size = UDim2.new(1, 0, 0, 40)
+MethodBtn.Position = UDim2.new(0, 0, 0, 25)
+MethodBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+MethodBtn.Text = "Метод: Workspace Spy"
+MethodBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MethodBtn.TextSize = 13
+MethodBtn.Font = Enum.Font.SourceSansBold
+MethodBtn.Parent = Content
 
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 8)
-    Corner.Parent = ToggleFrame
+local MB_Corner = Instance.new("UICorner")
+MB_Corner.CornerRadius = UDim.new(0, 6)
+MB_Corner.Parent = MethodBtn
 
-    local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -60, 1, 0)
-    Label.Position = UDim2.new(0, 12, 0, 0)
-    Label.BackgroundTransparency = 1
-    Label.Text = name
-    Label.TextColor3 = Color3.fromRGB(220, 220, 220)
-    Label.TextSize = 13
-    Label.Font = Enum.Font.GothamMedium
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.Parent = ToggleFrame
+-- Кнопка Старт/Стоп записи
+local RecordBtn = Instance.new("TextButton")
+RecordBtn.Size = UDim2.new(1, 0, 0, 45)
+RecordBtn.Position = UDim2.new(0, 0, 0, 80)
+RecordBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
+RecordBtn.Text = "Статус: ЗАПИСЬ ОСТАНОВЛЕНА"
+RecordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+RecordBtn.TextSize = 13
+RecordBtn.Font = Enum.Font.SourceSansBold
+RecordBtn.Parent = Content
 
-    local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(0, 40, 0, 22)
-    Btn.Position = UDim2.new(1, -50, 0.5, -11)
-    Btn.BackgroundColor3 = defaultState and Color3.fromRGB(50, 200, 100) or Color3.fromRGB(80, 80, 90)
-    Btn.Text = ""
-    Btn.Parent = ToggleFrame
+local RecCorner = Instance.new("UICorner")
+RecCorner.CornerRadius = UDim.new(0, 8)
+RecCorner.Parent = RecordBtn
 
-    local BtnCorner = Instance.new("UICorner")
-    BtnCorner.CornerRadius = UDim.new(1, 0)
-    BtnCorner.Parent = Btn
+-- Сетчик
+local InfoLabel = Instance.new("TextLabel")
+InfoLabel.Size = UDim2.new(1, 0, 0, 30)
+InfoLabel.Position = UDim2.new(0, 0, 0, 135)
+InfoLabel.BackgroundTransparency = 1
+InfoLabel.Text = "Собрано данных: 0"
+InfoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+InfoLabel.TextSize = 13
+InfoLabel.Font = Enum.Font.SourceSans
+InfoLabel.Parent = Content
 
-    local state = defaultState
-    Btn.MouseButton1Click:Connect(function()
-        state = not state
-        Btn.BackgroundColor3 = state and Color3.fromRGB(50, 200, 100) or Color3.fromRGB(80, 80, 90)
-        callback(state)
-    end)
-end
-
--- // Создаем чекбоксы фильтров в меню
-CreateToggle("Отсекать повороты камеры", Filters.IgnoreCamera, function(val) Filters.IgnoreCamera = val end)
-CreateToggle("Отсекать перемещение/позицию", Filters.IgnoreMovement, function(val) Filters.IgnoreMovement = val end)
-CreateToggle("Отсекать вызовы скриптов", Filters.IgnoreScripts, function(val) Filters.IgnoreScripts = val end)
-CreateToggle("Отсекать клики/стрельбу", Filters.IgnoreMouse, function(val) Filters.IgnoreMouse = val end)
-
--- Панель нижних кнопок (Экспорт и Очистка)
-local BottomBar = Instance.new("Frame")
-BottomBar.Size = UDim2.new(1, -20, 0, 40)
-BottomBar.Position = UDim2.new(0, 10, 1, -50)
-BottomBar.BackgroundTransparency = 1
-BottomBar.Parent = MainFrame
-
--- Кнопка экспорта в TXT
+-- Кнопка Сохранить в TXT
 local ExportBtn = Instance.new("TextButton")
-ExportBtn.Size = UDim2.new(0.65, 0, 1, 0)
-ExportBtn.BackgroundColor3 = Color3.fromRGB(40, 140, 255)
-ExportBtn.Text = "Экспорт в TXT"
+ExportBtn.Size = UDim2.new(1, 0, 0, 45)
+ExportBtn.Position = UDim2.new(0, 0, 0, 175)
+ExportBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 230)
+ExportBtn.Text = "Сохранить в TXT"
 ExportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ExportBtn.TextSize = 14
-ExportBtn.Font = Enum.Font.GothamBold
-ExportBtn.Parent = BottomBar
+ExportBtn.Font = Enum.Font.SourceSansBold
+ExportBtn.Parent = Content
 
 local ExportCorner = Instance.new("UICorner")
 ExportCorner.CornerRadius = UDim.new(0, 8)
 ExportCorner.Parent = ExportBtn
 
--- Кнопка очистки логов
-local ClearBtn = Instance.new("TextButton")
-ClearBtn.Size = UDim2.new(0.3, 0, 1, 0)
-ClearBtn.Position = UDim2.new(0.7, 10, 0, 0)
-ClearBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-ClearBtn.Text = "Очистить"
-ClearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ClearBtn.TextSize = 14
-ClearBtn.Font = Enum.Font.GothamBold
-ClearBtn.Parent = BottomBar
+-- Инструкция внизу
+local DescLabel = Instance.new("TextLabel")
+DescLabel.Size = UDim2.new(1, 0, 0, 100)
+DescLabel.Position = UDim2.new(0, 0, 0, 225)
+DescLabel.BackgroundTransparency = 1
+DescLabel.Text = "Нажмите на кнопку метода, чтобы переключить тактику чтения под клиентскую игру."
+DescLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
+DescLabel.TextSize = 11
+DescLabel.TextWrapped = true
+DescLabel.Font = Enum.Font.SourceSansItalic
+DescLabel.Parent = Content
 
-local ClearCorner = Instance.new("UICorner")
-ClearCorner.CornerRadius = UDim.new(0, 8)
-ClearCorner.Parent = ClearBtn
+-- // Логика переключения методов
+local methods = {"Workspace", "GC_Scan", "Attributes"}
+local methodNames = {
+    ["Workspace"] = "Метод: Workspace Spy (Спавн объектов)",
+    ["GC_Scan"] = "Метод: GC Inspector (Память / Таблицы)",
+    ["Attributes"] = "Метод: Attribute Hook (Свойства)"
+}
 
--- // Логика сворачивания / разворачивания
+MethodBtn.MouseButton1Click:Connect(function()
+    if currentMethod == "Workspace" then
+        currentMethod = "GC_Scan"
+    elseif currentMethod == "GC_Scan" then
+        currentMethod = "Attributes"
+    else
+        currentMethod = "Workspace"
+    end
+    MethodBtn.Text = methodNames[currentMethod]
+end)
+
+-- Логирование
+local function LogData(category, info)
+    if not isRecording then return end
+    local time = os.date("%H:%M:%S")
+    local entry = string.format("[%s] [%s] %s", time, category, info)
+    table.insert(capturedLogs, entry)
+    InfoLabel.Text = "Собрано данных: " .. #capturedLogs
+end
+
+-- // Реализация выбранных методов сканирования
+task.spawn(function()
+    -- 1. Метод Workspace Spy
+    Workspace.DescendantAdded:Connect(function(obj)
+        if isRecording and currentMethod == "Workspace" then
+            LogData("WORKSPACE", "Создан объект: " .. obj:GetFullName() .. " [" .. obj.ClassName .. "]")
+        end
+    end)
+end)
+
+-- 2. Периодический сканер памяти (GC) и атрибутов
+task.spawn(function()
+    while true do
+        task.wait(2)
+        if isRecording then
+            if currentMethod == "GC_Scan" and getgc then
+                pcall(function()
+                    for _, v in ipairs(getgc(true)) do
+                        if type(v) == "table" then
+                            -- Ищем ключевые клиентские параметры
+                            if rawget(v, "Damage") or rawget(v, "Speed") or rawget(v, "Health") then
+                                LogData("GC_SCAN", string.format("Найдена таблица параметров: Damage=%s, Speed=%s", tostring(v.Damage), tostring(v.Speed)))
+                            end
+                        end
+                    end
+                end)
+            elseif currentMethod == "Attributes" then
+                pcall(function()
+                    if LocalPlayer.Character then
+                        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                            for attr, val in pairs(part:GetAttributes()) do
+                                LogData("ATTRIBUTE", string.format("Объект %s | Атрибут %s = %s", part.Name, attr, tostring(val)))
+                            end
+                        end
+                    end
+                end)
+            end
+        end
+    end
+end)
+
+-- // Управление UI
 MinimizeBtn.MouseButton1Click:Connect(function()
     MainFrame.Visible = false
     FloatButton.Visible = true
@@ -211,84 +261,35 @@ FloatButton.MouseButton1Click:Connect(function()
     FloatButton.Visible = false
 end)
 
--- Функция добавления лога
-local function LogAction(category, data)
-    if not isRecording then return end
-    local timestamp = os.date("%H:%M:%S")
-    local entry = string.format("[%s] [%s] %s", timestamp, category, data)
-    table.insert(capturedLogs, entry)
-end
-
--- // Логика отслеживания локального игрока (Мувмент, Камера, Скрипты, Стрельба)
-
--- 1. Трекинг камеры
-RunService.RenderStepped:Connect(function()
-    if Filters.IgnoreCamera then return end
-    local camCF = Camera.CFrame
-    -- Логируем направление взгляда раз в несколько кадров или по сильному изменению
-    -- Для базы сделаем фиксацию основных углов раз в секунду через поток ниже
-end)
-
-task.spawn(function()
-    while true do
-        task.reload or task.wait(1)
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = LocalPlayer.Character.HumanoidRootPart
-            if not Filters.IgnoreMovement then
-                LogAction("MOVEMENT", string.format("Position: %.1f, %.1f, %.1f", hrp.Position.X, hrp.Position.Y, hrp.Position.Z))
-            end
-            if not Filters.IgnoreCamera then
-                local look = Camera.CFrame.LookVector
-                LogAction("CAMERA", string.format("LookVector: %.2f, %.2f, %.2f", look.X, look.Y, look.Z))
-            end
-        end
+RecordBtn.MouseButton1Click:Connect(function()
+    isRecording = not isRecording
+    if isRecording then
+        RecordBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+        RecordBtn.Text = "Статус: ЗАПИСЬ ИДЕТ (" .. currentMethod .. ")"
+    else
+        RecordBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
+        RecordBtn.Text = "Статус: ЗАПИСЬ ОСТАНОВЛЕНА"
     end
 end)
 
--- 2. Отслеживание кликов / стрельбы / мыши
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if Filters.IgnoreMouse then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        LogAction("ACTION", "Screen Tap / Click / Shoot input detected")
-    elseif input.UserInputType == Enum.UserInputType.Keyboard then
-        LogAction("INPUT", "Key pressed: " .. tostring(input.KeyCode))
-    end
-end)
-
--- 3. Мониторинг используемых скриптов локального игрока (Backpack / PlayerScripts)
-if LocalPlayer:FindFirstChild("PlayerScripts") then
-    for _, scriptObj in ipairs(LocalPlayer.PlayerScripts:GetDescendants()) do
-        if scriptObj:IsA("LocalScript") or scriptObj:IsA("ModuleScript") and not Filters.IgnoreScripts then
-            LogAction("SCRIPTS", "Found Script/Module: " .. scriptObj:GetFullName())
-        end
-    end
-end
-
--- // Функция экспорта в TXT файл (через writefile, если поддерживается эксплойтом)
 ExportBtn.MouseButton1Click:Connect(function()
-    local fileName = "Spy_" .. game.PlaceId .. ".txt"
-    local fileContent = table.concat(capturedLogs, "\n")
+    local filename = "Spy_" .. tostring(game.PlaceId) .. ".txt"
+    local content = table.concat(capturedLogs, "\n")
     
-    local success, err = pcall(function()
+    local writeOK = false
+    pcall(function()
         if writefile then
-            writefile(fileName, fileContent)
+            writefile(filename, content)
+            writeOK = true
         end
     end)
-    
-    if success and writefile then
-        ExportBtn.Text = "Сохранено!"
-        task.wait(1.5)
-        ExportBtn.Text = "Экспорт в TXT"
-    else
-        ExportBtn.Text = "Ошибка записи"
-        task.wait(1.5)
-        ExportBtn.Text = "Экспорт в TXT"
-    end
-end)
 
-ClearBtn.MouseButton1Click:Connect(function()
-    capturedLogs = {}
-    ClearBtn.Text = "Очищено"
-    task.wait(1)
-    ClearBtn.Text = "Очистить"
+    if writeOK then
+        ExportBtn.Text = "Сохранено в " .. filename
+    else
+        ExportBtn.Text = "Ошибка: writefile не поддерживается"
+    end
+    
+    task.wait(2)
+    ExportBtn.Text = "Сохранить в TXT"
 end)

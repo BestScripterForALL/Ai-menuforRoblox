@@ -1,4 +1,4 @@
--- Mobile AI Exploit Hub v6 (Тотальный сканер + Парсинг и Копирование Кода + Gemini API)
+-- Mobile AI Exploit Hub v6.5 (Тотальный сканер + Токены + Очистка чата + Авто-запуск + Системные роли)
 
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
@@ -32,12 +32,16 @@ if isfile and isfile(apiKeyFileName) then
     end
 end
 
+-- Базовый системный промпт (роль по умолчанию)
 local systemPrompt = [[
 Ты эксперт по разработке читов, экзекуторов и скриптов на Luau для Roblox.
 Твоя задача — писать чистые, оптимизированные, полностью рабочие Lua-скрипты для мобильных экзекуторов (Delta, Hydrogen, Arceus X).
 Используй современные практики Luau: индексы сервисов через game:GetService(), правильную работу с локальным игроком, персонажем, Humanoid, RemoteEvent (FireServer), а также кастомные глобальные функции экзекуторов (getgenv, firetouchinterest и т.д.).
-Важно: Всегда выделяй готовый Lua-код с помощью блоков markdown: ```lua ... ``` чтобы система могла распознать его и дать пользователю кнопку копирования!
+Важно: Всегда выделяй готовый Lua-код с помощью блоков markdown: ```lua ... ``` чтобы система могла распознать его и дать пользователю кнопку копирования и автозапуска!
 ]]
+
+-- Таблица для хранения истории сообщений (нужна для очистки чата и токенов)
+local chatHistory = {}
 
 -- ==================== ГЛАВНОЕ ОКНО ====================
 local MainFrame = Instance.new("Frame")
@@ -96,7 +100,7 @@ Title.Size = UDim2.new(1, -100, 1, 0)
 Title.Position = UDim2.new(0, 15, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "AI Roblox Exploit Hub v6"
+Title.Text = "AI Exploit Hub v6.5"
 Title.TextColor3 = Color3.fromRGB(240, 240, 255)
 Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -165,8 +169,39 @@ ChatView.BackgroundTransparency = 1
 ChatView.Visible = true
 ChatView.Parent = ContentContainer
 
+-- Верхняя панель чата (Индикатор токенов и кнопка Очистить)
+local ChatTopBar = Instance.new("Frame")
+ChatTopBar.Size = UDim2.new(1, 0, 0, 28)
+ChatTopBar.BackgroundTransparency = 1
+ChatTopBar.Parent = ChatView
+
+local TokenLabel = Instance.new("TextLabel")
+TokenLabel.Size = UDim2.new(0.5, 0, 1, 0)
+TokenLabel.BackgroundTransparency = 1
+TokenLabel.Font = Enum.Font.GothamMedium
+TokenLabel.Text = "💬 Токенов в памяти: ~0"
+TokenLabel.TextColor3 = Color3.fromRGB(140, 140, 170)
+TokenLabel.TextSize = 11
+TokenLabel.TextXAlignment = Enum.TextXAlignment.Left
+TokenLabel.Parent = ChatTopBar
+
+local ClearChatBtn = Instance.new("TextButton")
+ClearChatBtn.Size = UDim2.new(0, 95, 1, 0)
+ClearChatBtn.Position = UDim2.new(1, -95, 0, 0)
+ClearChatBtn.BackgroundColor3 = Color3.fromRGB(140, 45, 45)
+ClearChatBtn.Font = Enum.Font.GothamBold
+ClearChatBtn.Text = "🗑️ Очистить чат"
+ClearChatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ClearChatBtn.TextSize = 10
+ClearChatBtn.Parent = ChatTopBar
+
+local ClearCorner = Instance.new("UICorner")
+ClearCorner.CornerRadius = UDim.new(0, 6)
+ClearCorner.Parent = ClearChatBtn
+
 local ChatScroll = Instance.new("ScrollingFrame")
-ChatScroll.Size = UDim2.new(1, 0, 1, -45)
+ChatScroll.Size = UDim2.new(1, 0, 1, -75)
+ChatScroll.Position = UDim2.new(0, 0, 0, 32)
 ChatScroll.BackgroundTransparency = 1
 ChatScroll.BorderSizePixel = 0
 ChatScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -226,7 +261,7 @@ DexLayout.SortOrder = Enum.SortOrder.LayoutOrder
 DexLayout.Padding = UDim.new(0, 8)
 DexLayout.Parent = DexView
 
--- Настройки
+-- Настройки (С ключом и выбором ролей/промптов)
 local SettingsView = Instance.new("ScrollingFrame")
 SettingsView.Size = UDim2.new(1, 0, 1, 0)
 SettingsView.BackgroundTransparency = 1
@@ -276,6 +311,42 @@ ApiKeyInput.FocusLost:Connect(function()
     end
 end)
 
+local RoleTitle = Instance.new("TextLabel")
+RoleTitle.Size = UDim2.new(1, 0, 0, 20)
+RoleTitle.BackgroundTransparency = 1
+RoleTitle.Font = Enum.Font.GothamBold
+RoleTitle.Text = "Выбор роли / Системного промпта:"
+RoleTitle.TextColor3 = Color3.fromRGB(200, 200, 220)
+RoleTitle.TextSize = 13
+RoleTitle.TextXAlignment = Enum.TextXAlignment.Left
+RoleTitle.Parent = SettingsView
+
+local function createRoleButton(name, desc, newPrompt)
+    local rBtn = Instance.new("TextButton")
+    rBtn.Size = UDim2.new(1, 0, 0, 50)
+    rBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    rBtn.Font = Enum.Font.GothamBold
+    rBtn.Text = name .. "\n" .. desc
+    rBtn.TextColor3 = Color3.fromRGB(210, 210, 230)
+    rBtn.TextSize = 11
+    rBtn.Parent = SettingsView
+    
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 8)
+    c.Parent = rBtn
+    
+    rBtn.MouseButton1Click:Connect(function()
+        systemPrompt = newPrompt
+        rBtn.BackgroundColor3 = Color3.fromRGB(60, 40, 120)
+        task.wait(0.5)
+        rBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    end)
+end
+
+createRoleButton("⚡ Стандарт (Эксплойты и Читы)", "Пишет оптимизированные скрипты для мобильных экзекуторов.", systemPrompt)
+createRoleButton("🔬 Реверс-инженер", "Работай строго как реверс-инженер: анализируй сетевые протоколы и RemoteEvent.", "Ты опытный реверс-инженер игр Roblox. Анализируй структуру, ищи уязвимости в RemoteEvent, пиши эксплойты с упором на сетевой трафик и декомпиляцию. Всегда оформляй код в блоки ```lua ... ```.")
+createRoleButton("💡 Простые пояснения", "Объясняй всё простыми словами и пиши короткий код.", "Объясняй код и логику игры максимально простыми словами, пиши короткие и понятные скрипты. Всегда оформляй код в блоки ```lua ... ```.")
+
 local function switchTab(activeTab)
     ChatView.Visible = (activeTab == "Chat")
     DexView.Visible = (activeTab == "Dex")
@@ -324,8 +395,34 @@ MiniButton.MouseButton1Click:Connect(function()
     isMinimized = false
 end)
 
--- Функция добавления сообщений с поддержкой парсинга кода и кнопки "Скопировать код"
+-- Обновление счетчика токенов по истории
+local function updateTokenCounter()
+    local totalChars = 0
+    for _, msg in ipairs(chatHistory) do
+        totalChars = totalChars + #msg.text
+    end
+    -- Приблизительная оценка: 1 токен ~= 4 символа текста
+    local estimatedTokens = math.floor(totalChars / 4)
+    TokenLabel.Text = "💬 Токенов в памяти: ~" .. estimatedTokens
+end
+
+-- Очистка чата
+ClearChatBtn.MouseButton1Click:Connect(function()
+    for _, child in ipairs(ChatScroll:GetChildren()) do
+        if child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+    chatHistory = {}
+    updateTokenCounter()
+    addMessage("System", "История чата и контекст памяти полностью очищены!")
+end)
+
+-- Добавление сообщений с кнопками "Копировать" и "Запустить"
 local function addMessage(sender, text)
+    table.insert(chatHistory, {sender = sender, text = text})
+    updateTokenCounter()
+
     local msgFrame = Instance.new("Frame")
     msgFrame.Size = UDim2.new(1, 0, 0, 0)
     msgFrame.AutomaticSize = Enum.AutomaticSize.Y
@@ -342,25 +439,40 @@ local function addMessage(sender, text)
     txt.AutomaticSize = Enum.AutomaticSize.Y
     txt.BackgroundTransparency = 1
     txt.Font = Enum.Font.Gotham
-    txt.Text = sender .. ": " .. text
+    txt.Text = sender .. ": " + text -- Безопасное отображение
     txt.TextColor3 = (sender == "AI") and Color3.fromRGB(200, 180, 255) or Color3.fromRGB(230, 230, 240)
     txt.TextSize = 12
     txt.TextXAlignment = Enum.TextXAlignment.Left
     txt.TextWrapped = true
     txt.Parent = msgFrame
+    
+    -- Исправление конкатенации в TextLabel
+    txt.Text = sender .. ": " .. text
 
-    -- Проверяем, есть ли в тексте ответа код (выделенный ```lua ... ``` или просто ``` ... ```)
     local codeSnippet = text:match("```lua%s*(.-)%s*```") or text:match("```%s*(.-)%s*```")
 
     if sender == "AI" and codeSnippet then
+        -- Контейнер для кнопок под кодом
+        local btnContainer = Instance.new("Frame")
+        btnContainer.Size = UDim2.new(1, -10, 0, 28)
+        btnContainer.BackgroundTransparency = 1
+        btnContainer.Parent = msgFrame
+        
+        local bLayout = Instance.new("UIListLayout")
+        bLayout.FillDirection = Enum.FillDirection.Horizontal
+        bLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        bLayout.Padding = UDim.new(0, 6)
+        bLayout.Parent = btnContainer
+
+        -- Кнопка копирования
         local copyBtn = Instance.new("TextButton")
-        copyBtn.Size = UDim2.new(1, -10, 0, 28)
+        copyBtn.Size = UDim2.new(0.48, 0, 1, 0)
         copyBtn.BackgroundColor3 = Color3.fromRGB(70, 45, 140)
         copyBtn.Font = Enum.Font.GothamBold
-        copyBtn.Text = "📋 Скопировать код"
+        copyBtn.Text = "📋 Скопировать"
         copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        copyBtn.TextSize = 11
-        copyBtn.Parent = msgFrame
+        copyBtn.TextSize = 10
+        copyBtn.Parent = btnContainer
 
         local cCorner = Instance.new("UICorner")
         cCorner.CornerRadius = UDim.new(0, 6)
@@ -370,13 +482,54 @@ local function addMessage(sender, text)
             local setclip = setclipboard or toclipboard or set_clipboard
             if setclip then
                 setclip(codeSnippet)
-                copyBtn.Text = "✅ Код скопирован в буфер!"
-                copyBtn.BackgroundColor3 = Color3.fromRGB(40, 140, 70)
+                copyBtn.Text = "✅ Скопировано!"
                 task.wait(2)
-                copyBtn.Text = "📋 Скопировать код"
-                copyBtn.BackgroundColor3 = Color3.fromRGB(70, 45, 140)
+                copyBtn.Text = "📋 Скопировать"
             else
-                copyBtn.Text = "❌ Ошибка: setclipboard не поддерживается"
+                copyBtn.Text = "❌ Нет setclipboard"
+            end
+        end)
+
+        -- Кнопка автозапуска (Execute через loadstring + pcall)
+        local execBtn = Instance.new("TextButton")
+        execBtn.Size = UDim2.new(0.48, 0, 1, 0)
+        execBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
+        execBtn.Font = Enum.Font.GothamBold
+        execBtn.Text = "▶️ Запустить"
+        execBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        execBtn.TextSize = 10
+        execBtn.Parent = btnContainer
+
+        local eCorner = Instance.new("UICorner")
+        eCorner.CornerRadius = UDim.new(0, 6)
+        eCorner.Parent = execBtn
+
+        execBtn.MouseButton1Click:Connect(function()
+            local fn, syntaxError = loadstring(codeSnippet)
+            if not fn then
+                execBtn.Text = "❌ Ошибка синтаксиса"
+                execBtn.BackgroundColor3 = Color3.fromRGB(140, 40, 40)
+                addMessage("System", "Ошибка загрузки кода: " .. tostring(syntaxError))
+                task.wait(2)
+                execBtn.Text = "▶️ Запустить"
+                execBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
+                return
+            end
+            
+            local success, runtimeError = pcall(fn)
+            if success then
+                execBtn.Text = "✅ Успешно запущен!"
+                execBtn.BackgroundColor3 = Color3.fromRGB(30, 150, 70)
+                task.wait(2)
+                execBtn.Text = "▶️ Запустить"
+                execBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
+            else
+                execBtn.Text = "❌ Ошибка выполнения"
+                execBtn.BackgroundColor3 = Color3.fromRGB(140, 40, 40)
+                addMessage("System", "Ошибка при выполнении кода скрипта: " .. tostring(runtimeError))
+                task.wait(2)
+                execBtn.Text = "▶️ Запустить"
+                execBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
             end
         end)
     end
@@ -449,7 +602,7 @@ SendBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==================== ТОТАЛЬНЫЙ СКАНЕР ВСЕХ ПАПОК (Без освещения) ====================
+-- ==================== ТОТАЛЬНЫЙ СКАНЕР ВСЕХ ПАПОК ====================
 local function createActionCard(title, desc, callback)
     local card = Instance.new("Frame")
     card.Size = UDim2.new(1, 0, 0, 65)
@@ -517,7 +670,6 @@ createActionCard("Тотальный сканер (100% всё кроме све
             if success and children then
                 for _, child in ipairs(children) do
                     local className = child.ClassName
-                    -- Полный фильтр освещения и визуальных эффектов
                     if className ~= "Lighting" and className ~= "Atmosphere" and className ~= "Sky" and 
                        className ~= "PostEffect" and className ~= "BloomEffect" and className ~= "BlurEffect" and 
                        className ~= "ColorCorrectionEffect" and className ~= "DepthOfFieldEffect" and className ~= "SunRaysEffect" then
@@ -572,13 +724,12 @@ createActionCard("Тотальный сканер (100% всё кроме све
         end
         
         local fullReport = table.concat(txtLines, "\n")
-        
         local fileName = "AiRobloxHub_" .. tostring(game.PlaceId) .. ".txt"
         
         if writefile then
             pcall(function()
                 writefile(fileName, fullReport)
-                addMessage("System", "Файл отчета пересохранен: " .. fileName)
+                addMessage("System", "Файл отчета сохранен: " .. fileName)
             end)
         end
         

@@ -1,10 +1,8 @@
--- Mobile DevEx Explorer & Parser v2.1 (Standalone / Full Fix)
+-- Mobile DevEx Explorer & Parser v3.0 (Tabs + Export Settings)
 
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 
 local protectgui = protectgui or (syn and syn.protect_gui) or function() end
 
@@ -20,11 +18,25 @@ ScreenGui.Parent = CoreGui
 
 local currentMode = "Safe"
 
--- Главное окно в стиле DevEx
+-- Настройки экспорта
+local exportSettings = {
+    Workspace = true,
+    Players = true,
+    CoreGui = false,
+    Lighting = true,
+    ReplicatedStorage = true,
+    ReplicatedFirst = true,
+    StarterGui = true,
+    StarterPack = true,
+    StarterPlayer = true,
+    IncludeScriptsCode = true
+}
+
+-- Главное окно
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 460, 0, 320)
-MainFrame.Position = UDim2.new(0.5, -230, 0.5, -160)
+MainFrame.Size = UDim2.new(0, 480, 0, 340)
+MainFrame.Position = UDim2.new(0.5, -240, 0.5, -170)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = ScreenGui
@@ -54,7 +66,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "Mobile DevEx Explorer v2.1"
+Title.Text = "Mobile DevEx Explorer v3.0"
 Title.TextColor3 = Color3.fromRGB(210, 210, 230)
 Title.TextSize = 12
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -97,71 +109,90 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Левая панель управления
-local LeftPanel = Instance.new("Frame")
-LeftPanel.Size = UDim2.new(0, 140, 1, -38)
-LeftPanel.Position = UDim2.new(0, 4, 0, 34)
-LeftPanel.BackgroundTransparency = 1
-LeftPanel.Parent = MainFrame
+-- Панель вкладок (Табы)
+local TabBar = Instance.new("Frame")
+TabBar.Size = UDim2.new(1, -16, 0, 28)
+TabBar.Position = UDim2.new(0, 8, 0, 34)
+TabBar.BackgroundTransparency = 1
+TabBar.Parent = MainFrame
 
-local LeftLayout = Instance.new("UIListLayout")
-LeftLayout.SortOrder = Enum.SortOrder.LayoutOrder
-LeftLayout.Padding = UDim.new(0, 6)
-LeftLayout.Parent = LeftPanel
+local TabListLayout = Instance.new("UIListLayout")
+TabListLayout.FillDirection = Enum.FillDirection.Horizontal
+TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabListLayout.Padding = UDim.new(0, 6)
+TabListLayout.Parent = TabBar
 
-local function createButton(name, color, order, callback)
+local contentFrames = {}
+
+local function createTabButton(name, order)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 30)
-    btn.BackgroundColor3 = color
+    btn.Size = UDim2.new(0, 145, 1, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 38)
     btn.Font = Enum.Font.GothamBold
     btn.Text = name
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextColor3 = Color3.fromRGB(170, 170, 190)
     btn.TextSize = 10
     btn.LayoutOrder = order
-    btn.Parent = LeftPanel
-    
+    btn.Parent = TabBar
+
     local c = Instance.new("UICorner")
     c.CornerRadius = UDim.new(0, 5)
     c.Parent = btn
     
-    btn.MouseButton1Click:Connect(callback)
-    return btn
+    local frame = Instance.new("ScrollingFrame")
+    frame.Size = UDim2.new(1, -16, 1, -72)
+    frame.Position = UDim2.new(0, 8, 0, 68)
+    frame.BackgroundTransparency = 1
+    frame.BorderSizePixel = 0
+    frame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    frame.ScrollBarThickness = 3
+    frame.Visible = false
+    frame.Parent = MainFrame
+    
+    table.insert(contentFrames, {Button = btn, Frame = frame})
+    return btn, frame
 end
 
--- Переключатель режимов Safe / Aggressive (Исправлен)
-local ModeBtn = createButton("Режим: Safe", Color3.fromRGB(30, 80, 50), 1, function()
-    if currentMode == "Safe" then
-        currentMode = "Aggressive"
-        ModeBtn.Text = "Режим: Aggressive"
-        ModeBtn.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
-    else
-        currentMode = "Safe"
-        ModeBtn.Text = "Режим: Safe"
-        ModeBtn.BackgroundColor3 = Color3.fromRGB(30, 80, 50)
+local explorerTabBtn, ExplorerFrame = createTabButton("📂 Эксплорер", 1)
+local parserTabBtn, ParserConfigFrame = createTabButton("⚙ Настройки парсера", 2)
+local exportTabBtn, ExportConfigFrame = createTabButton("💾 Настройки экспорта", 3)
+
+local function switchTab(activeFrame, activeBtn)
+    for _, item in ipairs(contentFrames) do
+        item.Frame.Visible = (item.Frame == activeFrame)
+        item.Button.BackgroundColor3 = (item.Button == activeBtn) and Color3.fromRGB(45, 55, 90) or Color3.fromRGB(25, 25, 38)
+        item.Button.TextColor3 = (item.Button == activeBtn) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(170, 170, 190)
     end
-end)
+end
 
--- Правый Explorer
-local ExplorerFrame = Instance.new("ScrollingFrame")
-ExplorerFrame.Size = UDim2.new(1, -148, 1, -38)
-ExplorerFrame.Position = UDim2.new(0, 144, 0, 34)
-ExplorerFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
-ExplorerFrame.BorderSizePixel = 0
-ExplorerFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-ExplorerFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-ExplorerFrame.ScrollBarThickness = 3
-ExplorerFrame.Parent = MainFrame
+explorerTabBtn.MouseButton1Click:Connect(function() switchTab(ExplorerFrame, explorerTabBtn) end)
+parserTabBtn.MouseButton1Click:Connect(function() switchTab(ParserConfigFrame, parserTabBtn) end)
+exportTabBtn.MouseButton1Click:Connect(function() switchTab(ExportConfigFrame, exportTabBtn) end)
 
-local ExplorerCorner = Instance.new("UICorner")
-ExplorerCorner.CornerRadius = UDim.new(0, 6)
-ExplorerCorner.Parent = ExplorerFrame
+-- Инициализация первой вкладки по умолчанию
+switchTab(ExplorerFrame, explorerTabBtn)
 
-local ExplorerLayout = Instance.new("UIListLayout")
-ExplorerLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ExplorerLayout.Padding = UDim.new(0, 2)
-ExplorerLayout.Parent = ExplorerFrame
+-- Стили классов
+local function getClassStyle(className)
+    if className == "Workspace" then return "🌍", Color3.fromRGB(80, 160, 255)
+    elseif className == "Players" then return "👥", Color3.fromRGB(90, 200, 120)
+    elseif className == "Lighting" then return "💡", Color3.fromRGB(240, 220, 80)
+    elseif className == "ReplicatedStorage" then return "📦", Color3.fromRGB(230, 150, 50)
+    elseif className == "ReplicatedFirst" then return "⚡", Color3.fromRGB(120, 180, 255)
+    elseif className == "ServerScriptService" or className == "ServerStorage" then return "🔒", Color3.fromRGB(70, 180, 110)
+    elseif className == "StarterGui" or className == "StarterPack" or className == "StarterPlayer" then return "📁", Color3.fromRGB(220, 190, 80)
+    elseif className == "Folder" then return "📁", Color3.fromRGB(200, 170, 70)
+    elseif className == "Model" then return "📦", Color3.fromRGB(220, 140, 60)
+    elseif className == "Part" or className == "MeshPart" or className == "UnionOperation" then return "🧊", Color3.fromRGB(160, 160, 180)
+    elseif className == "LocalScript" or className == "ModuleScript" or className == "Script" then return "📜", Color3.fromRGB(255, 120, 120)
+    elseif className == "RemoteEvent" or className == "RemoteFunction" then return "🔥", Color3.fromRGB(255, 90, 90)
+    elseif className:find("Value") then return "📊", Color3.fromRGB(100, 220, 220)
+    else return "🔹", Color3.fromRGB(170, 170, 190)
+    end
+end
 
--- Всплывающее окно просмотра
+-- Модальное окно просмотра скрипта
 local ScriptViewerFrame = Instance.new("Frame")
 ScriptViewerFrame.Size = UDim2.new(0, 300, 0, 240)
 ScriptViewerFrame.Position = UDim2.new(0.5, -150, 0.5, -120)
@@ -206,9 +237,7 @@ local SVCancelCorner = Instance.new("UICorner")
 SVCancelCorner.CornerRadius = UDim.new(0, 4)
 SVCancelCorner.Parent = SVCancel
 
-SVCancel.MouseButton1Click:Connect(function()
-    ScriptViewerFrame.Visible = false
-end)
+SVCancel.MouseButton1Click:Connect(function() ScriptViewerFrame.Visible = false end)
 
 local SVTextBox = Instance.new("TextBox")
 SVTextBox.Size = UDim2.new(1, -16, 1, -70)
@@ -280,48 +309,11 @@ SVTxtBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local MiniButton = Instance.new("TextButton")
-MiniButton.Name = "MiniButton"
-MiniButton.Size = UDim2.new(0, 36, 0, 36)
-MiniButton.Position = UDim2.new(1, -45, 1, -45)
-MiniButton.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
-MiniButton.Font = Enum.Font.GothamBold
-MiniButton.Text = "DX"
-MiniButton.TextColor3 = Color3.fromRGB(150, 170, 255)
-MiniButton.TextSize, MiniButton.Visible = 12, false
-MiniButton.Parent = ScreenGui
-
-local MiniC = Instance.new("UICorner")
-MiniC.CornerRadius = UDim.new(0, 8)
-MiniC.Parent = MiniButton
-
-HideBtn.MouseButton1Click:Connect(function()
-    MainFrame.Visible = false
-    MiniButton.Visible = true
-end)
-
-MiniButton.MouseButton1Click:Connect(function()
-    MainFrame.Visible = true
-    MiniButton.Visible = false
-end)
-
-local function getClassStyle(className)
-    if className == "Workspace" then return "🌍", Color3.fromRGB(80, 160, 255)
-    elseif className == "Players" then return "👥", Color3.fromRGB(90, 200, 120)
-    elseif className == "Lighting" then return "💡", Color3.fromRGB(240, 220, 80)
-    elseif className == "ReplicatedStorage" then return "📦", Color3.fromRGB(230, 150, 50)
-    elseif className == "ReplicatedFirst" then return "⚡", Color3.fromRGB(120, 180, 255)
-    elseif className == "ServerScriptService" or className == "ServerStorage" then return "🔒", Color3.fromRGB(70, 180, 110)
-    elseif className == "StarterGui" or className == "StarterPack" or className == "StarterPlayer" then return "📁", Color3.fromRGB(220, 190, 80)
-    elseif className == "Folder" then return "📁", Color3.fromRGB(200, 170, 70)
-    elseif className == "Model" then return "📦", Color3.fromRGB(220, 140, 60)
-    elseif className == "Part" or className == "MeshPart" or className == "UnionOperation" then return "🧊", Color3.fromRGB(160, 160, 180)
-    elseif className == "LocalScript" or className == "ModuleScript" or className == "Script" then return "📜", Color3.fromRGB(255, 120, 120)
-    elseif className == "RemoteEvent" or className == "RemoteFunction" then return "🔥", Color3.fromRGB(255, 90, 90)
-    elseif className:find("Value") then return "📊", Color3.fromRGB(100, 220, 220)
-    else return "🔹", Color3.fromRGB(170, 170, 190)
-    end
-end
+-- Рендер дерева в вкладке Эксплорер
+local ExplorerLayout = Instance.new("UIListLayout")
+ExplorerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ExplorerLayout.Padding = UDim.new(0, 2)
+ExplorerLayout.Parent = ExplorerFrame
 
 local function createTreeNode(obj, parentContainer, depth)
     local success, children = pcall(function() return obj:GetChildren() end)
@@ -400,13 +392,11 @@ local function createTreeNode(obj, parentContainer, depth)
                     if successDecomp and decompResult and #decompResult > 10 then
                         aggInfo = aggInfo .. decompResult
                     else
-                        aggInfo = aggInfo .. "-- [Lite Spy] Эмуляция цепочки вызовов:\n"
+                        aggInfo = aggInfo .. "-- [Lite Spy] Эмуляция вызовов:\n"
                         if obj:IsA("RemoteEvent") then
                             aggInfo = aggInfo .. "game:GetService(\"" .. obj.Parent.Name .. "\")." .. obj.Name .. ":FireServer()\n"
                         elseif obj:IsA("RemoteFunction") then
                             aggInfo = aggInfo .. "game:GetService(\"" .. obj.Parent.Name .. "\")." .. obj.Name .. ":InvokeServer()\n"
-                        else
-                            aggInfo = aggInfo .. "-- Нет активных сетевых триггеров."
                         end
                     end
                     currentLoadedContent = aggInfo
@@ -450,65 +440,54 @@ local function createTreeNode(obj, parentContainer, depth)
     end
 end
 
-createButton("📦 Полный эксплор в TXT", Color3.fromRGB(60, 45, 120), 2, function()
-    task.spawn(function()
-        local txtLines = {}
-        table.insert(txtLines, "=== MOBILE DEV-EX FULL REPORT (PLACE ID: " .. tostring(game.PlaceId) .. ") ===")
-        table.insert(txtLines, "Режим сканирования: " .. currentMode)
-        table.insert(txtLines, "Дата: " .. os.date("%Y-%m-%d %H:%M:%S") .. "\n")
+-- Вкладка 2: Настройки парсера
+local ParserLayout = Instance.new("UIListLayout")
+ParserLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ParserLayout.Padding = UDim.new(0, 8)
+ParserLayout.Parent = ParserConfigFrame
 
-        local function deepDump(obj, depth)
-            local success, children = pcall(function() return obj:GetChildren() end)
-            if not success or not children then return end
-            for _, c in ipairs(children) do
-                local line = string.rep("  ", math.min(depth, 6)) .. "- [" .. c.ClassName .. "] " .. c.Name
-                if c:IsA("ValueBase") then
-                    line = line .. " (Value: " .. tostring(c.Value) .. ")"
-                end
-                table.insert(txtLines, line)
-                if #txtLines < 1200 then
-                    deepDump(c, depth + 1)
-                end
-            end
-        end
+local ModeToggleBtn = Instance.new("TextButton")
+ModeToggleBtn.Size = UDim2.new(1, 0, 0, 36)
+ModeToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 80, 50)
+ModeToggleBtn.Font = Enum.Font.GothamBold
+ModeToggleBtn.Text = "Режим сканирования: Safe"
+ModeToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ModeToggleBtn.TextSize = 11
+ModeToggleBtn.Parent = ParserConfigFrame
 
-        local services = {
-            game:GetService("Workspace"),
-            game:GetService("Players"),
-            game:GetService("CoreGui"),
-            game:GetService("Lighting"),
-            game:GetService("ReplicatedStorage"),
-            game:GetService("ReplicatedFirst"),
-            game:GetService("StarterGui"),
-            game:GetService("StarterPack"),
-            game:GetService("StarterPlayer"),
-            game:GetService("SoundService"),
-            game:GetService("TextChatService")
-        }
+local mtc = Instance.new("UICorner")
+mtc.CornerRadius = UDim.new(0, 6)
+mtc.Parent = ModeToggleBtn
 
-        for _, s in ipairs(services) do
-            table.insert(txtLines, "\n--- Сервис: " .. s.Name .. " ---")
-            deepDump(s, 1)
-        end
-
-        local report = table.concat(txtLines, "\n")
-        local fileName = "DevExReport_" .. tostring(game.PlaceId) .. ".txt"
-        if writefile then
-            pcall(function()
-                writefile(fileName, report)
-                Title.Text = "Сохранено: " .. fileName
-                task.wait(3)
-                Title.Text = "Mobile DevEx Explorer v2.1"
-            end)
-        end
-    end)
+ModeToggleBtn.MouseButton1Click:Connect(function()
+    if currentMode == "Safe" then
+        currentMode = "Aggressive"
+        ModeToggleBtn.Text = "Режим сканирования: Aggressive"
+        ModeToggleBtn.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+    else
+        currentMode = "Safe"
+        ModeToggleBtn.Text = "Режим сканирования: Safe"
+        ModeToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 80, 50)
+    end
 end)
 
-createButton("🔄 Обновить Explorer", Color3.fromRGB(40, 90, 60), 3, function()
+local RefreshExplorerBtn = Instance.new("TextButton")
+RefreshExplorerBtn.Size = UDim2.new(1, 0, 0, 36)
+RefreshExplorerBtn.BackgroundColor3 = Color3.fromRGB(40, 90, 60)
+RefreshExplorerBtn.Font = Enum.Font.GothamBold
+RefreshExplorerBtn.Text = "🔄 Перезагрузить Explorer"
+RefreshExplorerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+RefreshExplorerBtn.TextSize = 11
+RefreshExplorerBtn.Parent = ParserConfigFrame
+
+local rebC = Instance.new("UICorner")
+rebC.CornerRadius = UDim.new(0, 6)
+rebC.Parent = RefreshExplorerBtn
+
+RefreshExplorerBtn.MouseButton1Click:Connect(function()
     for _, ch in ipairs(ExplorerFrame:GetChildren()) do
         if ch:IsA("Frame") then ch:Destroy() end
     end
-
     local rootServices = {
         game:GetService("Workspace"),
         game:GetService("Players"),
@@ -522,12 +501,155 @@ createButton("🔄 Обновить Explorer", Color3.fromRGB(40, 90, 60), 3, fu
         game:GetService("SoundService"),
         game:GetService("TextChatService")
     }
-
     for _, s in ipairs(rootServices) do
         createTreeNode(s, ExplorerFrame, 0)
     end
+    switchTab(ExplorerFrame, explorerTabBtn)
 end)
 
+-- Вкладка 3: Настройки экспорта
+local ExportLayout = Instance.new("UIListLayout")
+ExportLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ExportLayout.Padding = UDim.new(0, 6)
+ExportLayout.Parent = ExportConfigFrame
+
+local function createCheckbox(labelName, settingKey)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 30)
+    btn.BackgroundColor3 = exportSettings[settingKey] and Color3.fromRGB(35, 75, 50) or Color3.fromRGB(30, 30, 42)
+    btn.Font = Enum.Font.GothamBold
+    btn.Text = labelName .. ": " .. (exportSettings[settingKey] and "[ВКЛ]" or "[ВЫКЛ]")
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 10
+    btn.Parent = ExportConfigFrame
+
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 5)
+    c.Parent = btn
+
+    btn.MouseButton1Click:Connect(function()
+        exportSettings[settingKey] = not exportSettings[settingKey]
+        btn.BackgroundColor3 = exportSettings[settingKey] and Color3.fromRGB(35, 75, 50) or Color3.fromRGB(30, 30, 42)
+        btn.Text = labelName .. ": " .. (exportSettings[settingKey] and "[ВКЛ]" or "[ВЫКЛ]")
+    end)
+end
+
+createCheckbox("Экспортировать Workspace", "Workspace")
+createCheckbox("Экспортировать Players", "Players")
+createCheckbox("Экспортировать CoreGui", "CoreGui")
+createCheckbox("Экспортировать Lighting", "Lighting")
+createCheckbox("Экспортировать ReplicatedStorage", "ReplicatedStorage")
+createCheckbox("Экспортировать ReplicatedFirst", "ReplicatedFirst")
+createCheckbox("Экспортировать StarterGui", "StarterGui")
+createCheckbox("Экспортировать StarterPack", "StarterPack")
+createCheckbox("Экспортировать StarterPlayer", "StarterPlayer")
+createCheckbox("Добавлять код скриптов (Декомпиляция)", "IncludeScriptsCode")
+
+local RunExportBtn = Instance.new("TextButton")
+RunExportBtn.Size = UDim2.new(1, 0, 0, 36)
+RunExportBtn.BackgroundColor3 = Color3.fromRGB(70, 45, 120)
+RunExportBtn.Font = Enum.Font.GothamBold
+RunExportBtn.Text = "💾 Выгрузить выбранное в TXT"
+RunExportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+RunExportBtn.TextSize = 11
+RunExportBtn.Parent = ExportConfigFrame
+
+local reC = Instance.new("UICorner")
+reC.CornerRadius = UDim.new(0, 6)
+reC.Parent = RunExportBtn
+
+RunExportBtn.MouseButton1Click:Connect(function()
+    task.spawn(function()
+        local txtLines = {}
+        table.insert(txtLines, "=== CUSTOM DEV-EX EXPORT REPORT ===")
+        table.insert(txtLines, "Place ID: " .. tostring(game.PlaceId))
+        table.insert(txtLines, "Дата: " .. os.date("%Y-%m-%d %H:%M:%S") .. "\n")
+
+        local function deepDump(obj, depth)
+            local success, children = pcall(function() return obj:GetChildren() end)
+            if not success or not children then return end
+            for _, c in ipairs(children) do
+                local line = string.rep("  ", math.min(depth, 6)) .. "- [" .. c.ClassName .. "] " .. c.Name
+                if c:IsA("ValueBase") then
+                    line = line .. " (Value: " .. tostring(c.Value) .. ")"
+                end
+                table.insert(txtLines, line)
+
+                -- Если включено сохранение кода скриптов и это скрипт
+                if exportSettings.IncludeScriptsCode and (c:IsA("LocalScript") or c:IsA("ModuleScript") or c:IsA("Script")) then
+                    local decompOK, decompRes = pcall(function() return decompile and decompile(c) or "-- нет декомпилятора" end)
+                    table.insert(txtLines, string.rep("  ", math.min(depth + 1, 6)) .. "--- [СКОПИРОВАННЫЙ КОД СРИПТА] ---")
+                    for scriptLine in (decompRes or ""):gmatch("[^\r\n]+") do
+                        table.insert(txtLines, string.rep("  ", math.min(depth + 1, 6)) .. "  " .. scriptLine)
+                    end
+                    table.insert(txtLines, string.rep("  ", math.min(depth + 1, 6)) .. "---------------------------------")
+                end
+
+                if #txtLines < 2500 then
+                    deepDump(c, depth + 1)
+                end
+            end
+        end
+
+        local serviceCandidates = {
+            Workspace = game:GetService("Workspace"),
+            Players = game:GetService("Players"),
+            CoreGui = game:GetService("CoreGui"),
+            Lighting = game:GetService("Lighting"),
+            ReplicatedStorage = game:GetService("ReplicatedStorage"),
+            ReplicatedFirst = game:GetService("ReplicatedFirst"),
+            StarterGui = game:GetService("StarterGui"),
+            StarterPack = game:GetService("StarterPack"),
+            StarterPlayer = game:GetService("StarterPlayer")
+        }
+
+        for key, srv in pairs(serviceCandidates) do
+            if exportSettings[key] then
+                table.insert(txtLines, "\n--- Сервис: " .. srv.Name .. " ---")
+                deepDump(srv, 1)
+            end
+        end
+
+        local report = table.concat(txtLines, "\n")
+        local fileName = "CustomDevExReport_" .. tostring(game.PlaceId) .. ".txt"
+        if writefile then
+            pcall(function()
+                writefile(fileName, report)
+                RunExportBtn.Text = "✅ Сохранено в " .. fileName
+                task.wait(3)
+                RunExportBtn.Text = "💾 Выгрузить выбранное в TXT"
+            end)
+        end
+    end)
+end)
+
+-- Сворачивание / разворачивание
+local MiniButton = Instance.new("TextButton")
+MiniButton.Name = "MiniButton"
+MiniButton.Size = UDim2.new(0, 36, 0, 36)
+MiniButton.Position = UDim2.new(1, -45, 1, -45)
+MiniButton.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
+MiniButton.Font = Enum.Font.GothamBold
+MiniButton.Text = "DX"
+MiniButton.TextColor3 = Color3.fromRGB(150, 170, 255)
+MiniButton.TextSize, MiniButton.Visible = 12, false
+MiniButton.Parent = ScreenGui
+
+local MiniC = Instance.new("UICorner")
+MiniC.CornerRadius = UDim.new(0, 8)
+MiniC.Parent = MiniButton
+
+HideBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    MiniButton.Visible = true
+end)
+
+MiniButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true
+    MiniButton.Visible = false
+end)
+
+-- Первичная загрузка эксплорера
 local initialServices = {
     game:GetService("Workspace"),
     game:GetService("Players"),

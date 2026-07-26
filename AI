@@ -1,4 +1,4 @@
--- Мобильный чит-ассистент для Roblox v4 (Умная перезапись TXT + Текстовая передача в ИИ)
+-- Mobile AI Exploit Hub v6 (Тотальный сканер + Парсинг и Копирование Кода + Gemini API)
 
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
@@ -33,10 +33,10 @@ if isfile and isfile(apiKeyFileName) then
 end
 
 local systemPrompt = [[
-Ты эксперт по разработке читов, экзекуторов и скриптов на Luau для Roblox. 
+Ты эксперт по разработке читов, экзекуторов и скриптов на Luau для Roblox.
 Твоя задача — писать чистые, оптимизированные, полностью рабочие Lua-скрипты для мобильных экзекуторов (Delta, Hydrogen, Arceus X).
 Используй современные практики Luau: индексы сервисов через game:GetService(), правильную работу с локальным игроком, персонажем, Humanoid, RemoteEvent (FireServer), а также кастомные глобальные функции экзекуторов (getgenv, firetouchinterest и т.д.).
-Не пиши лишней воды, выдавай сразу готовый код в Markdown-блоках с короткими пояснениями.
+Важно: Всегда выделяй готовый Lua-код с помощью блоков markdown: ```lua ... ``` чтобы система могла распознать его и дать пользователю кнопку копирования!
 ]]
 
 -- ==================== ГЛАВНОЕ ОКНО ====================
@@ -91,19 +91,12 @@ local TopCorner = Instance.new("UICorner")
 TopCorner.CornerRadius = UDim.new(0, 14)
 TopCorner.Parent = TopBar
 
-local TopCover = Instance.new("Frame")
-TopCover.Size = UDim2.new(1, 0, 0, 10)
-TopCover.Position = UDim2.new(0, 0, 1, -10)
-TopCover.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-TopCover.BorderSizePixel = 0
-TopCover.Parent = TopBar
-
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -100, 1, 0)
 Title.Position = UDim2.new(0, 15, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "AI Roblox Exploit Hub v4"
+Title.Text = "AI Roblox Exploit Hub v6"
 Title.TextColor3 = Color3.fromRGB(240, 240, 255)
 Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -183,7 +176,7 @@ ChatScroll.Parent = ChatView
 
 local ChatLayout = Instance.new("UIListLayout")
 ChatLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ChatLayout.Padding = UDim.new(0, 6)
+ChatLayout.Padding = UDim.new(0, 8)
 ChatLayout.Parent = ChatScroll
 
 local ChatInputBox = Instance.new("TextBox")
@@ -331,6 +324,7 @@ MiniButton.MouseButton1Click:Connect(function()
     isMinimized = false
 end)
 
+-- Функция добавления сообщений с поддержкой парсинга кода и кнопки "Скопировать код"
 local function addMessage(sender, text)
     local msgFrame = Instance.new("Frame")
     msgFrame.Size = UDim2.new(1, 0, 0, 0)
@@ -338,9 +332,13 @@ local function addMessage(sender, text)
     msgFrame.BackgroundTransparency = 1
     msgFrame.Parent = ChatScroll
     
+    local layout = Instance.new("UIListLayout")
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 4)
+    layout.Parent = msgFrame
+
     local txt = Instance.new("TextLabel")
     txt.Size = UDim2.new(1, -10, 0, 0)
-    txt.Position = UDim2.new(0, 5, 0, 0)
     txt.AutomaticSize = Enum.AutomaticSize.Y
     txt.BackgroundTransparency = 1
     txt.Font = Enum.Font.Gotham
@@ -350,6 +348,38 @@ local function addMessage(sender, text)
     txt.TextXAlignment = Enum.TextXAlignment.Left
     txt.TextWrapped = true
     txt.Parent = msgFrame
+
+    -- Проверяем, есть ли в тексте ответа код (выделенный ```lua ... ``` или просто ``` ... ```)
+    local codeSnippet = text:match("```lua%s*(.-)%s*```") or text:match("```%s*(.-)%s*```")
+
+    if sender == "AI" and codeSnippet then
+        local copyBtn = Instance.new("TextButton")
+        copyBtn.Size = UDim2.new(1, -10, 0, 28)
+        copyBtn.BackgroundColor3 = Color3.fromRGB(70, 45, 140)
+        copyBtn.Font = Enum.Font.GothamBold
+        copyBtn.Text = "📋 Скопировать код"
+        copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        copyBtn.TextSize = 11
+        copyBtn.Parent = msgFrame
+
+        local cCorner = Instance.new("UICorner")
+        cCorner.CornerRadius = UDim.new(0, 6)
+        cCorner.Parent = copyBtn
+
+        copyBtn.MouseButton1Click:Connect(function()
+            local setclip = setclipboard or toclipboard or set_clipboard
+            if setclip then
+                setclip(codeSnippet)
+                copyBtn.Text = "✅ Код скопирован в буфер!"
+                copyBtn.BackgroundColor3 = Color3.fromRGB(40, 140, 70)
+                task.wait(2)
+                copyBtn.Text = "📋 Скопировать код"
+                copyBtn.BackgroundColor3 = Color3.fromRGB(70, 45, 140)
+            else
+                copyBtn.Text = "❌ Ошибка: setclipboard не поддерживается"
+            end
+        end)
+    end
 end
 
 local function sendToAI(promptText)
@@ -359,7 +389,7 @@ local function sendToAI(promptText)
         return
     end
     
-    addMessage("You", "Отчет плейса отправлен в ИИ для анализа...")
+    addMessage("You", promptText)
     
     task.spawn(function()
         local requestFunc = syn and syn.request or http_request or request
@@ -368,8 +398,8 @@ local function sendToAI(promptText)
             return
         end
         
-        local url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" .. apiKey
-
+        local url = "[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=)" .. apiKey
+        
         local bodyData = {
             contents = {
                 {
@@ -419,7 +449,7 @@ SendBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==================== СКАНЕР С ПЕРЕЗАПИСЬЮ ФАЙЛА И ТЕКСТОВОЙ ПЕРЕДАЧЕЙ ====================
+-- ==================== ТОТАЛЬНЫЙ СКАНЕР ВСЕХ ПАПОК (Без освещения) ====================
 local function createActionCard(title, desc, callback)
     local card = Instance.new("Frame")
     card.Size = UDim2.new(1, 0, 0, 65)
@@ -470,46 +500,53 @@ local function createActionCard(title, desc, callback)
     btn.MouseButton1Click:Connect(callback)
 end
 
-createActionCard("Глубокий анализ (Перезапись TXT)", "Сканирует плейс, перезаписывает файл (НазваниеЧита_ID.txt) и передает отчет ИИ.", function()
+createActionCard("Тотальный сканер (100% всё кроме света)", "Сканирует абсолютно все папки и объекты игры, исключая только освещение/атмосферу.", function()
     task.spawn(function()
-        addMessage("System", "Сканирование структуры плейса...")
+        addMessage("System", "Запуск тотального сканирования всех папок...")
         
         local txtLines = {}
-        table.insert(txtLines, "=== DEVEX EXPLORER REPORT (PLACE ID: " .. tostring(game.PlaceId) .. ") ===")
+        table.insert(txtLines, "=== TOTAL EXPLOIT EXPLORER REPORT (PLACE ID: " .. tostring(game.PlaceId) .. ") ===")
         table.insert(txtLines, "Дата: " .. os.date("%Y-%m-%d %H:%M:%S") .. "\n")
         
         local function dumpObject(parentObj, depth)
-            local indent = string.rep("  ", math.min(depth, 6))
+            local indent = string.rep("  ", math.min(depth, 8))
             local success, children = pcall(function()
                 return parentObj:GetChildren()
             end)
             
             if success and children then
                 for _, child in ipairs(children) do
-                    local line = indent .. "- [" .. child.ClassName .. "] " .. child.Name
-                    
-                    if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
-                        line = line .. " [🔥 REMOTE]"
-                    elseif child:IsA("LocalScript") or child:IsA("ModuleScript") then
-                        line = line .. " [📜 SCRIPT]"
-                    elseif child:IsA("Folder") then
-                        line = line .. " [📁 FOLDER]"
-                    elseif child:IsA("Model") then
-                        line = line .. " [📦 MODEL]"
-                    elseif child:IsA("Tool") then
-                        line = line .. " [⚔️ TOOL]"
-                    elseif child:IsA("ScreenGui") or child:IsA("Frame") then
-                        line = line .. " [🖼️ UI]"
+                    local className = child.ClassName
+                    -- Полный фильтр освещения и визуальных эффектов
+                    if className ~= "Lighting" and className ~= "Atmosphere" and className ~= "Sky" and 
+                       className ~= "PostEffect" and className ~= "BloomEffect" and className ~= "BlurEffect" and 
+                       className ~= "ColorCorrectionEffect" and className ~= "DepthOfFieldEffect" and className ~= "SunRaysEffect" then
+                        
+                        local line = indent .. "- [" .. className .. "] " .. child.Name
+                        
+                        if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
+                            line = line .. " [🔥 REMOTE]"
+                        elseif child:IsA("LocalScript") or child:IsA("ModuleScript") or child:IsA("Script") then
+                            line = line .. " [📜 SCRIPT]"
+                        elseif child:IsA("Folder") then
+                            line = line .. " [📁 FOLDER]"
+                        elseif child:IsA("Model") then
+                            line = line .. " [📦 MODEL]"
+                        elseif child:IsA("Tool") then
+                            line = line .. " [⚔️ TOOL]"
+                        elseif child:IsA("ScreenGui") or child:IsA("Frame") or child:IsA("TextButton") then
+                            line = line .. " [🖼️ UI]"
+                        end
+                        
+                        table.insert(txtLines, line)
+                        
+                        if #txtLines > 900 then
+                            table.insert(txtLines, "... [ПРЕРВАНО: Достигнут лимит строк отчета] ...")
+                            return
+                        end
+                        
+                        dumpObject(child, depth + 1)
                     end
-                    
-                    table.insert(txtLines, line)
-                    
-                    if #txtLines > 650 then
-                        table.insert(txtLines, "... [ПРЕРВАНО: Лимит строк отчета] ...")
-                        return
-                    end
-                    
-                    dumpObject(child, depth + 1)
                 end
             end
         end
@@ -518,35 +555,35 @@ createActionCard("Глубокий анализ (Перезапись TXT)", "С
             {name = "Workspace", obj = game:GetService("Workspace")},
             {name = "ReplicatedStorage", obj = game:GetService("ReplicatedStorage")},
             {name = "ReplicatedFirst", obj = game:GetService("ReplicatedFirst")},
-            {name = "Players (LocalPlayer)", obj = game:GetService("Players").LocalPlayer},
-            {name = "StarterGui", obj = game:GetService("StarterGui")}
+            {name = "ServerStorage", obj = game:GetService("ServerStorage")},
+            {name = "ServerScriptService", obj = game:GetService("ServerScriptService")},
+            {name = "SoundService", obj = game:GetService("SoundService")},
+            {name = "StarterPlayer", obj = game:GetService("StarterPlayer")},
+            {name = "StarterGui", obj = game:GetService("StarterGui")},
+            {name = "Players", obj = game:GetService("Players")}
         }
         
         for _, sInfo in ipairs(servicesToScan) do
             if sInfo.obj then
                 table.insert(txtLines, "\n--- [" .. sInfo.name .. "] ---")
                 dumpObject(sInfo.obj, 1)
-                if #txtLines > 650 then break end
+                if #txtLines > 900 then break end
             end
         end
         
         local fullReport = table.concat(txtLines, "\n")
         
-        -- Умная запись/перезапись файла: НазваниеЧита_IDплейса.txt
-        local exploitName = "AiRobloxHub"
-        local fileName = exploitName .. "_" .. tostring(game.PlaceId) .. ".txt"
+        local fileName = "AiRobloxHub_" .. tostring(game.PlaceId) .. ".txt"
         
         if writefile then
             pcall(function()
-                -- writefile автоматически перезаписывает файл, если он уже существовал, либо создает новый
                 writefile(fileName, fullReport)
-                addMessage("System", "Файл успешно сохранен/перезаписан: " .. fileName)
+                addMessage("System", "Файл отчета пересохранен: " .. fileName)
             end)
         end
         
-        -- Поскольку Gemini не принимает файлы напрямую, передаем весь отчет в текстовом виде через промпт
         switchTab("Chat")
-        sendToAI("Вот структурированный TXT-отчет игры (сохранен в файл " .. fileName .. "). На основе этой структуры напиши готовый чит-скрипт под эту игру:\n\n" .. fullReport)
+        sendToAI("Вот тотальный отчет структуры этой игры (все папки, ремоуты, скрипты и UI кроме света, сохранен в " .. fileName .. "). Напиши мощный чит на основе этих данных:\n\n" .. fullReport)
     end)
 end)
 

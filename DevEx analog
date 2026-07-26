@@ -1,0 +1,485 @@
+-- Mobile DevEx Explorer & Parser v1.0 (Safe / Aggressive Modes)
+
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local protectgui = protectgui or (syn and syn.protect_gui) or function() end
+
+if CoreGui:FindFirstChild("MobileDevExHub") then
+    CoreGui.MobileDevExHub:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MobileDevExHub"
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+protectgui(ScreenGui)
+ScreenGui.Parent = CoreGui
+
+local currentMode = "Safe" -- "Safe" или "Aggressive"
+local scannedDataCache = {}
+
+-- Главное окно в стиле DevEx (черно-темно-синее)
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 440, 0, 300)
+MainFrame.Position = UDim2.new(0.5, -220, 0.5, -150)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 8)
+MainCorner.Parent = MainFrame
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(40, 50, 90)
+MainStroke.Thickness = 1.5
+MainStroke.Parent = MainFrame
+
+-- Шапка (как в DevEx)
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 30)
+TopBar.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local TopCorner = Instance.new("UICorner")
+TopCorner.CornerRadius = UDim.new(0, 8)
+TopCorner.Parent = TopBar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -120, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.GothamBold
+Title.Text = "Mobile DevEx Explorer"
+Title.TextColor3 = Color3.fromRGB(210, 210, 230)
+Title.TextSize = 12
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TopBar
+
+-- Кнопка скрытия меню (как в DevEx)
+local HideBtn = Instance.new("TextButton")
+HideBtn.Size = UDim2.new(0, 50, 0, 22)
+HideBtn.Position = UDim2.new(1, -55, 0.5, -11)
+HideBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+HideBtn.Font = Enum.Font.GothamBold
+HideBtn.Text = "Скрыть"
+HideBtn.TextColor3 = Color3.fromRGB(180, 180, 200)
+HideBtn.TextSize = 10
+HideBtn.Parent = TopBar
+
+local HideCorner = Instance.new("UICorner")
+HideCorner.CornerRadius = UDim.new(0, 4)
+HideCorner.Parent = HideBtn
+
+-- Перетаскивание окна
+local dragging, dragInput, dragStart, startPos
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+    end
+end)
+
+TopBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Левая панель управления (Режимы, Сканирование)
+local LeftPanel = Instance.new("Frame")
+LeftPanel.Size = UDim2.new(0, 140, 1, -38)
+LeftPanel.Position = UDim2.new(0, 4, 0, 34)
+LeftPanel.BackgroundTransparency = 1
+LeftPanel.Parent = MainFrame
+
+local LeftLayout = Instance.new("UIListLayout")
+LeftLayout.SortOrder = Enum.SortOrder.LayoutOrder
+LeftLayout.Padding = UDim.new(0, 6)
+LeftLayout.Parent = LeftPanel
+
+local function createButton(name, color, order, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 30)
+    btn.BackgroundColor3 = color
+    btn.Font = Enum.Font.GothamBold
+    btn.Text = name
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 10
+    btn.LayoutOrder = order
+    btn.Parent = LeftPanel
+    
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 5)
+    c.Parent = btn
+    
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+-- Переключатель Safe / Aggressive
+local ModeBtn = createButton("Режим: Safe", Color3.fromRGB(30, 80, 50), 1, function()
+    if currentMode == "Safe" then
+        currentMode = "Aggressive"
+        ModeBtn.Text = "Режим: Aggressive"
+        ModeBtn.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+    else
+        currentMode = "Safe"
+        ModeBtn.Text = "Режим: Safe"
+        ModeBtn.BackgroundColor3 = Color3.fromRGB(30, 80, 50)
+    end
+end)
+
+-- Правый Explorer (структура 1 в 1 как в Studio)
+local ExplorerFrame = Instance.new("ScrollingFrame")
+ExplorerFrame.Size = UDim2.new(1, -148, 1, -38)
+ExplorerFrame.Position = UDim2.new(0, 144, 0, 34)
+ExplorerFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
+ExplorerFrame.BorderSizePixel = 0
+ExplorerFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ExplorerFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ExplorerFrame.ScrollBarThickness = 3
+ExplorerFrame.Parent = MainFrame
+
+local ExplorerCorner = Instance.new("UICorner")
+ExplorerCorner.CornerRadius = UDim.new(0, 6)
+ExplorerCorner.Parent = ExplorerFrame
+
+local ExplorerLayout = Instance.new("UIListLayout")
+ExplorerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ExplorerLayout.Padding = UDim.new(0, 2)
+ExplorerLayout.Parent = ExplorerFrame
+
+-- Меню просмотрщика скрипта/объекта (всплывающее)
+local ScriptViewerFrame = Instance.new("Frame")
+ScriptViewerFrame.Size = UDim2.new(0, 280, 0, 220)
+ScriptViewerFrame.Position = UDim2.new(0.5, -140, 0.5, -110)
+ScriptViewerFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+ScriptViewerFrame.Visible = false
+ScriptViewerFrame.ZIndex = 10
+ScriptViewerFrame.Parent = MainFrame
+
+local SVCorner = Instance.new("UICorner")
+SVCorner.CornerRadius = UDim.new(0, 8)
+SVCorner.Parent = ScriptViewerFrame
+
+local SVStroke = Instance.new("UIStroke")
+SVStroke.Color = Color3.fromRGB(60, 80, 140)
+SVStroke.Thickness = 1.5
+SVStroke.Parent = ScriptViewerFrame
+
+local SVTitle = Instance.new("TextLabel")
+SVTitle.Size = UDim2.new(1, -30, 0, 25)
+SVTitle.Position = UDim2.new(0, 8, 0, 5)
+SVTitle.BackgroundTransparency = 1
+SVTitle.Font = Enum.Font.GothamBold
+SVTitle.Text = "Просмотр содержимого"
+SVTitle.TextColor3 = Color3.fromRGB(220, 220, 240)
+SVTitle.TextSize = 11
+SVTitle.TextXAlignment = Enum.TextXAlignment.Left
+SVTitle.ZIndex = 10
+SVTitle.Parent = ScriptViewerFrame
+
+local SVCancel = Instance.new("TextButton")
+SVCancel.Size = UDim2.new(0, 22, 0, 22)
+SVCancel.Position = UDim2.new(1, -26, 0, 5)
+SVCancel.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+SVCancel.Font = Enum.Font.GothamBold
+SVCancel.Text = "X"
+SVCancel.TextColor3 = Color3.fromRGB(255, 255, 255)
+SVCancel.TextSize = 10
+SVCancel.ZIndex = 10
+SVCancel.Parent = ScriptViewerFrame
+
+local SVCancelCorner = Instance.new("UICorner")
+SVCancelCorner.CornerRadius = UDim.new(0, 4)
+SVCancelCorner.Parent = SVCancel
+
+SVCancel.MouseButton1Click:Connect(function()
+    ScriptViewerFrame.Visible = false
+end)
+
+local SVTextBox = Instance.new("TextBox")
+SVTextBox.Size = UDim2.new(1, -16, 1, -70)
+SVTextBox.Position = UDim2.new(0, 8, 0, 32)
+SVTextBox.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
+SVTextBox.Font = Enum.Font.Code
+SVTextBox.MultiLine = true
+SVTextBox.ClearTextOnFocus = false
+SVTextBox.Text = ""
+SVTextBox.TextColor3 = Color3.fromRGB(200, 200, 220)
+SVTextBox.TextSize = 11
+SVTextBox.TextXAlignment = Enum.TextXAlignment.Left
+SVTextBox.TextYAlignment = Enum.TextYAlignment.Top
+SVTextBox.ZIndex = 10
+SVTextBox.Parent = ScriptViewerFrame
+
+local SVCopyBtn = Instance.new("TextButton")
+SVCopyBtn.Size = UDim2.new(0.48, 0, 0, 28)
+SVCopyBtn.Position = UDim2.new(0, 8, 1, -34)
+SVCopyBtn.BackgroundColor3 = Color3.fromRGB(50, 40, 100)
+SVCopyBtn.Font = Enum.Font.GothamBold
+SVCopyBtn.Text = "📋 В буфер"
+SVCopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SVCopyBtn.TextSize = 10
+SVCopyBtn.ZIndex = 10
+SVCopyBtn.Parent = ScriptViewerFrame
+
+local SVCc = Instance.new("UICorner")
+SVCc.CornerRadius = UDim.new(0, 5)
+SVCc.Parent = SVCopyBtn
+
+local SVTxtBtn = Instance.new("TextButton")
+SVTxtBtn.Size = UDim2.new(0.48, 0, 0, 28)
+SVTxtBtn.Position = UDim2.new(0.52, 0, 1, -34)
+SVTxtBtn.BackgroundColor3 = Color3.fromRGB(40, 90, 60)
+SVTxtBtn.Font = Enum.Font.GothamBold
+SVTxtBtn.Text = "💾 В .txt"
+SVTxtBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SVTxtBtn.TextSize = 10
+SVTxtBtn.ZIndex = 10
+SVTxtBtn.Parent = ScriptViewerFrame
+
+local SVTc = Instance.new("UICorner")
+TCR = UDim.new(0, 5)
+SVTc.CornerRadius = UDim.new(0, 5)
+SVTc.Parent = SVTxtBtn
+
+local currentLoadedContent = ""
+local currentLoadedName = "script"
+
+SVCopyBtn.MouseButton1Click:Connect(function()
+    local setclip = setclipboard or toclipboard or set_clipboard
+    if setclip then
+        setclip(currentLoadedContent)
+        SVCopyBtn.Text = "✅ Скопировано"
+        task.wait(1.5)
+        SVCopyBtn.Text = "📋 В буфер"
+    end
+end)
+
+SVTxtBtn.MouseButton1Click:Connect(function()
+    if writefile then
+        local fname = "DevEx_" .. currentLoadedName .. "_" .. math.random(100,999) .. ".txt"
+        pcall(function()
+            writefile(fname, currentLoadedContent)
+            SVTxtBtn.Text = "✅ Сохранено"
+            task.wait(1.5)
+            SVTxtBtn.Text = "💾 В .txt"
+        end)
+    end
+end)
+
+-- Мини-кнопка для восстановления окна из скрытого состояния
+local MiniButton = Instance.new("TextButton")
+MiniButton.Name = "MiniButton"
+MiniButton.Size = UDim2.new(0, 36, 0, 36)
+MiniButton.Position = UDim2.new(1, -45, 1, -45)
+MiniButton.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
+MiniButton.Font = Enum.Font.GothamBold
+MiniButton.Text = "DX"
+MiniButton.TextColor3 = Color3.fromRGB(150, 170, 255)
+MiniButton.TextSize, MiniButton.Visible = 12, false
+MiniButton.Parent = ScreenGui
+
+local MiniC = Instance.new("UICorner")
+MiniC.CornerRadius = UDim.new(0, 8)
+MiniC.Parent = MiniButton
+
+HideBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    MiniButton.Visible = true
+end)
+
+MiniButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true
+    MiniButton.Visible = false
+end)
+
+-- Функция рекурсивного заполнения Explorer с поддержкой плюсиков [+] для скриптов/данных
+local function buildExplorerTree(parentObj, container, depth)
+    local success, children = pcall(function() return parentObj:GetChildren() end)
+    if not success or not children then return end
+
+    for _, child in ipairs(children) do
+        local itemFrame = Instance.new("Frame")
+        itemFrame.Size = UDim2.new(1, 0, 0, 22)
+        itemFrame.BackgroundTransparency = 1
+        itemFrame.Parent = container
+
+        local indent = math.min(depth * 10, 120)
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, -indent - 25, 1, 0)
+        label.Position = UDim2.new(0, indent, 0, 0)
+        label.BackgroundTransparency = 1
+        label.Font = Enum.Font.Gotham
+        label.Text = child.Name .. " [" .. child.ClassName .. "]"
+        label.TextColor3 = Color3.fromRGB(190, 190, 210)
+        label.TextSize = 10
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = itemFrame
+
+        -- Проверка: если это скрипт или объект с ценными данными (IntValue, StringValue и т.д.)
+        local isScript = child:IsA("LocalScript") or child:IsA("ModuleScript") or child:IsA("Script")
+        local isDataVal = child:IsA("ValueBase") or child:IsA("RemoteEvent") or child:IsA("RemoteFunction")
+
+        if isScript or isDataVal then
+            local plusBtn = Instance.new("TextButton")
+            plusBtn.Size = UDim2.new(0, 20, 0, 18)
+            plusBtn.Position = UDim2.new(1, -22, 0.5, -9)
+            plusBtn.BackgroundColor3 = Color3.fromRGB(40, 50, 80)
+            plusBtn.Font = Enum.Font.GothamBold
+            plusBtn.Text = "+"
+            plusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            plusBtn.TextSize = 10
+            plusBtn.Parent = itemFrame
+
+            local pc = Instance.new("UICorner")
+            pc.CornerRadius = UDim.new(0, 3)
+            pc.Parent = plusBtn
+
+            plusBtn.MouseButton1Click:Connect(function()
+                currentLoadedName = child.Name
+                if isScript then
+                    if currentMode == "Safe" then
+                        local successDecomp, decompResult = pcall(function()
+                            return decompile and decompile(child) or "-- Декомпилятор недоступен в Safe моде"
+                        end)
+                        currentLoadedContent = successDecomp and decompResult or "-- Ошибка декомпиляции"
+                    else
+                        -- Aggressive Mode: Попытка прочитать обычным способом + Lite Spy генерация по вызовам
+                        local successDecomp, decompResult = pcall(function()
+                            return decompile and decompile(child) or "-- Ошибка чтения"
+                        end)
+                        
+                        local aggInfo = "-- [AGGRESSIVE MODE PARSER]\n-- Источник: " .. child:GetFullName() .. "\n\n"
+                        if successDecomp and decompResult and #decompResult > 10 then
+                            aggInfo = aggInfo .. decompResult
+                        else
+                            aggInfo = aggInfo .. "-- [Lite Spy] Скрипт зашифрован или пуст. Эмуляция цепочки вызовов:\n"
+                            if child:IsA("RemoteEvent") then
+                                aggInfo = aggInfo .. "game:GetService(\"" .. child.Parent.Name .. "\")." .. child.Name .. ":FireServer()\n"
+                            elseif child:IsA("RemoteFunction") then
+                                aggInfo = aggInfo .. "game:GetService(\"" .. child.Parent.Name .. "\")." .. child.Name .. ":InvokeServer()\n"
+                            else
+                                aggInfo = aggInfo .. "-- Нет активных сетевых триггеров для этого типа объекта."
+                            end
+                        end
+                        currentLoadedContent = aggInfo
+                    end
+                elseif child:IsA("ValueBase") then
+                    currentLoadedContent = "-- Значение объекта " .. child.Name .. " [" .. child.ClassName .. "]:\nValue = " .. tostring(child.Value)
+                else
+                    currentLoadedContent = "-- Данные объекта: " .. child.Name .. " [" .. child.ClassName .. "]"
+                end
+
+                SVTitle.Text = "Объект: " .. child.Name
+                SVTextBox.Text = currentLoadedContent
+                ScriptViewerFrame.Visible = true
+            end)
+        end
+
+        buildExplorerTree(child, container, depth + 1)
+    end
+end
+
+-- Кнопка 1: Пропарсить всё и сохранить в TXT с PlaceId
+createButton("📦 Полный эксплор в TXT", Color3.fromRGB(60, 45, 120), 2, function()
+    task.spawn(function()
+        local txtLines = {}
+        table.insert(txtLines, "=== MOBILE DEV-EX FULL REPORT (PLACE ID: " .. tostring(game.PlaceId) .. ") ===")
+        table.insert(txtLines, "Режим сканирования: " .. currentMode)
+        table.insert(txtLines, "Дата: " .. os.date("%Y-%m-%d %H:%M:%S") .. "\n")
+
+        local function deepDump(obj, depth)
+            local success, children = pcall(function() return obj:GetChildren() end)
+            if not success or not children then return end
+            for _, c in ipairs(children) do
+                local line = string.rep("  ", math.min(depth, 6)) .. "- [" .. c.ClassName .. "] " .. c.Name
+                if c:IsA("ValueBase") then
+                    line = line .. " (Value: " .. tostring(c.Value) .. ")"
+                end
+                table.insert(txtLines, line)
+                if #txtLines < 1200 then
+                    deepDump(c, depth + 1)
+                end
+            end
+        end
+
+        local services = {
+            game:GetService("Workspace"),
+            game:GetService("ReplicatedStorage"),
+            game:GetService("ReplicatedFirst"),
+            game:GetService("StarterGui"),
+            game:GetService("Players"),
+            game:GetService("Lighting")
+        }
+
+        for _, s in ipairs(services) do
+            table.insert(txtLines, "\n--- Сервис: " .. s.Name .. " ---")
+            deepDump(s, 1)
+        end
+
+        local report = table.concat(txtLines, "\n")
+        local fileName = "DevExReport_" .. tostring(game.PlaceId) .. ".txt"
+        if writefile then
+            pcall(function()
+                writefile(fileName, report)
+                Title.Text = "Сохранено: " .. fileName
+                task.wait(3)
+                Title.Text = "Mobile DevEx Explorer"
+            end)
+        end
+    end)
+end)
+
+-- Кнопка 2: Обновить Explorer в интерфейсе
+createButton("🔄 Обновить Explorer", Color3.fromRGB(40, 90, 60), 3, function()
+    for _, ch in ipairs(ExplorerFrame:GetChildren()) do
+        if ch:IsA("Frame") then ch:Destroy() end
+    end
+
+    -- Строим дерево основных игровых контейнеров
+    local rootServices = {
+        game:GetService("Workspace"),
+        game:GetService("ReplicatedStorage"),
+        game:GetService("ReplicatedFirst"),
+        game:GetService("StarterGui"),
+        game:GetService("StarterPlayer"),
+        game:GetService("Players")
+    }
+
+    for _, s in ipairs(rootServices) do
+        local sf = Instance.new("Frame")
+        sf.Size = UDim2.new(1, 0, 0, 22)
+        sf.BackgroundTransparency = 1
+        sf.Parent = ExplorerFrame
+
+        local sl = Instance.new("TextLabel")
+        sl.Size = UDim2.new(1, -10, 1, 0)
+        sl.Position = UDim2.new(0, 5, 0, 0)
+        sl.BackgroundTransparency = 1
+        sl.Font = Enum.Font.GothamBold
+        sl.Text = "📂 " .. s.Name .. " [Service]"
+        sl.TextColor3 = Color3.fromRGB(130, 160, 255)
+        sl.TextSize = 11
+        sl.TextXAlignment = Enum.TextXAlignment.Left
+        sl.Parent = sf
+
+        buildExplorerTree(s, ExplorerFrame, 1)
+    end
+end)

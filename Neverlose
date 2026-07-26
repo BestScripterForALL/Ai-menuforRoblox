@@ -1,4 +1,4 @@
--- Защищенный загрузчик Neverlose Mobile UI Library (Fixed ESP & Teammate Check & Attack Event)
+-- Защищенный загрузчик Neverlose Mobile UI Library (Optimized ESP, No Anti-Aim, Fire Lock & Touch Aim Alternative)
 local success, errorMessage = pcall(function()
     local Players = game:GetService("Players")
     local UserInputService = game:GetService("UserInputService")
@@ -19,18 +19,11 @@ local success, errorMessage = pcall(function()
         PlayerGui.NeverloseAttackButton:Destroy()
     end
 
-    -- Таблица конфигурации читов
+    -- Таблица конфигурации читов (Без анти-аимов)
     local Config = {
-        Rage = { 
-            Enable = false, 
-            AutoShoot = false, 
-            FOV = 45,
-            AntiAim = false,
-            Pitch = "Zero",
-            Yaw = "Static"
-        },
+        Rage = { Enable = false, AutoShoot = false, FOV = 45 },
         Legit = { Enable = false, Smoothness = 5, FOV = 15 },
-        Visuals = { ESP = true, BoxOutline = true, MaxDist = 250 },
+        Visuals = { ESP = true, BoxOutline = true, MaxDist = 10000 },
         Misc = { Bunnyhop = false, Speed = 16, JumpPower = 50 },
         Configs = { Selected = "Default" }
     }
@@ -163,12 +156,8 @@ local success, errorMessage = pcall(function()
         PageLayout.Padding = UDim.new(0, 6)
 
         TabButton.MouseButton1Click:Connect(function()
-            for _, p in pairs(Pages) do
-                p.Visible = false
-            end
-            for _, t in pairs(Tabs) do
-                t.TextColor3 = Color3.fromRGB(150, 150, 160)
-            end
+            for _, p in pairs(Pages) do p.Visible = false end
+            for _, t in pairs(Tabs) do t.TextColor3 = Color3.fromRGB(150, 150, 160) end
             Page.Visible = true
             TabButton.TextColor3 = Color3.fromRGB(120, 110, 255)
         end)
@@ -322,74 +311,20 @@ local success, errorMessage = pcall(function()
         end)
     end
 
-    local function AddDropdown(parent, title, options, default, callback)
-        local currentIdx = 1
-        for i, opt in ipairs(options) do
-            if opt == default then currentIdx = i break end
-        end
-
-        local DropBtn = Instance.new("TextButton")
-        DropBtn.Parent = parent
-        DropBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
-        DropBtn.BackgroundTransparency = 0.3
-        DropBtn.Size = UDim2.new(1, -6, 0, 28)
-        DropBtn.AutoButtonColor = false
-        DropBtn.Text = ""
-        DropBtn.BorderSizePixel = 0
-
-        local Corner = Instance.new("UICorner")
-        Corner.CornerRadius = UDim.new(0, 4)
-        Corner.Parent = DropBtn
-
-        local Label = Instance.new("TextLabel")
-        Label.Parent = DropBtn
-        Label.BackgroundTransparency = 1
-        Label.Position = UDim2.new(0, 8, 0, 0)
-        Label.Size = UDim2.new(0, 100, 1, 0)
-        Label.Font = Enum.Font.Gotham
-        Label.Text = title
-        Label.TextColor3 = Color3.fromRGB(200, 200, 210)
-        Label.TextSize = 10
-        Label.TextXAlignment = Enum.TextXAlignment.Left
-
-        local ValLabel = Instance.new("TextLabel")
-        ValLabel.Parent = DropBtn
-        ValLabel.BackgroundTransparency = 1
-        ValLabel.Position = UDim2.new(1, -110, 0, 0)
-        ValLabel.Size = UDim2.new(0, 100, 1, 0)
-        ValLabel.Font = Enum.Font.GothamBold
-        ValLabel.Text = options[currentIdx]
-        ValLabel.TextColor3 = Color3.fromRGB(120, 110, 255)
-        ValLabel.TextSize = 10
-        ValLabel.TextXAlignment = Enum.TextXAlignment.Right
-
-        DropBtn.MouseButton1Click:Connect(function()
-            currentIdx = currentIdx + 1
-            if currentIdx > #options then currentIdx = 1 end
-            local selected = options[currentIdx]
-            ValLabel.Text = selected
-            if callback then callback(selected) end
-        end)
-    end
-
     --------------------------------------------------
-    -- ЗАПОЛНЕНИЕ ВКЛАДОК
+    -- ЗАПОЛНЕНИЕ ВКЛАДОК (Без Anti-Aim)
     --------------------------------------------------
     AddToggle(RagePage, "Enable Ragebot", false, function(v) Config.Rage.Enable = v end)
     AddToggle(RagePage, "Auto Shoot", false, function(v) Config.Rage.AutoShoot = v end)
     AddSlider(RagePage, "Field of View", 1, 180, 45, function(v) Config.Rage.FOV = v end)
-    
-    AddToggle(RagePage, "Anti-Aim (AA)", false, function(v) Config.Rage.AntiAim = v end)
-    AddDropdown(RagePage, "AA Pitch", {"Down", "Up", "Zero", "Custom"}, "Zero", function(v) Config.Rage.Pitch = v end)
-    AddDropdown(RagePage, "AA Yaw", {"Static", "Jitter", "Spin"}, "Static", function(v) Config.Rage.Yaw = v end)
 
     AddToggle(LegitPage, "Enable Legitbot", false, function(v) Config.Legit.Enable = v end)
     AddSlider(LegitPage, "Smoothness", 1, 20, 5, function(v) Config.Legit.Smoothness = v end)
-    AddSlider(LegitPage, "Field of View", 5, 500, 15, function(v) Config.Legit.FOV = v end)
+    AddSlider(LegitPage, "Field of View", 5, 50, 15, function(v) Config.Legit.FOV = v end)
 
     AddToggle(VisualsPage, "Player ESP", true, function(v) Config.Visuals.ESP = v end)
     AddToggle(VisualsPage, "Box Outline", true, function(v) Config.Visuals.BoxOutline = v end)
-    AddSlider(VisualsPage, "Max Distance", 50, 500, 250, function(v) Config.Visuals.MaxDist = v end)
+    AddSlider(VisualsPage, "Max Distance", 100, 10000, 2500, function(v) Config.Visuals.MaxDist = v end)
 
     AddToggle(MiscPage, "Bunnyhop", false, function(v) Config.Misc.Bunnyhop = v end)
     AddSlider(MiscPage, "WalkSpeed", 16, 100, 16, function(v) Config.Misc.Speed = v end)
@@ -415,15 +350,13 @@ local success, errorMessage = pcall(function()
     AddButton(ConfigsPage, "Load Config", function() print("[Neverlose] Loaded!") end)
 
     --------------------------------------------------
-    -- ПРОВЕРКА НА ТИМЕЙТА (Безопасная функция)
+    -- ПРОВЕРКА НА ТИМЕЙТА
     --------------------------------------------------
     local function IsTeammate(player)
         if player == LocalPlayer then return true end
-        -- Проверка по стандартной командной системе Roblox
         if player.Team and LocalPlayer.Team and player.Team == LocalPlayer.Team then
             return true
         end
-        -- Дополнительная проверка на атрибуты/теги если заданы в игре
         if player:GetAttribute("Team") and LocalPlayer:GetAttribute("Team") then
             if player:GetAttribute("Team") == LocalPlayer:GetAttribute("Team") then
                 return true
@@ -433,9 +366,10 @@ local success, errorMessage = pcall(function()
     end
 
     --------------------------------------------------
-    -- ИСПРАВЛЕННЫЙ И СТАБИЛЬНЫЙ ВХ (ESP)
+    -- ОПТИМИЗИРОВАННЫЙ ВХ (ОБНОВЛЕНИЕ РАЗ В 35 КАДРОВ)
     --------------------------------------------------
-    local EspFrames = {}
+    local frameCounter = 0
+    local targetFrameInterval = math.floor(60 / 35) -- кадровый троттлинг (~ каждые 1-2 кадра для стабильности 35 FPS обновления)
 
     local function UpdateESP()
         for _, player in ipairs(Players:GetPlayers()) do
@@ -470,7 +404,7 @@ local success, errorMessage = pcall(function()
 
                             local frame = boxGui:FindFirstChild("Box")
                             if frame then
-                                local sizeFactor = math.clamp(2500 / dist, 10, 500)
+                                local sizeFactor = math.clamp(2500 / dist, 5, 500)
                                 frame.Size = UDim2.new(0, sizeFactor * 0.6, 0, sizeFactor)
                                 frame.Position = UDim2.new(0, screenPos.X - (sizeFactor * 0.3), 0, screenPos.Y - (sizeFactor * 0.5))
                                 boxGui.Enabled = true
@@ -488,8 +422,14 @@ local success, errorMessage = pcall(function()
         end
     end
 
+    -- Отслеживание ухода/появления новых игроков для мгновенной очистки/создания
+    Players.PlayerRemoving:Connect(function(player)
+        local gui = PlayerGui:FindFirstChild("NeverloseESP_" .. player.Name)
+        if gui then gui:Destroy() end
+    end)
+
     --------------------------------------------------
-    -- КНОПКА СТРЕЛЬБЫ СПРАВА (Специальный элемент управления)
+    -- КНОПКА СТРЕЛЬБЫ С БЛОКИРОВКОЙ ДЖОЙСТИКА НА 10 СЕКУНД
     --------------------------------------------------
     local AttackGui = Instance.new("ScreenGui")
     AttackGui.Name = "NeverloseAttackButton"
@@ -513,14 +453,14 @@ local success, errorMessage = pcall(function()
     AttackCorner.CornerRadius = UDim.new(1, 0)
     AttackCorner.Parent = AttackBtn
 
-    -- Функция вызова события стрельбы
+    local joystickLockedUntil = 0
     local isShooting = false
+
     local function TriggerShoot()
         if isShooting then return end
         isShooting = true
         task.spawn(function()
             pcall(function()
-                -- Эмуляция нажатия ЛКМ / выстрела для мобильных экзекуторов
                 VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
                 task.wait(0.05)
                 VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
@@ -531,55 +471,37 @@ local success, errorMessage = pcall(function()
     end
 
     AttackBtn.MouseButton1Down:Connect(function()
+        joystickLockedUntil = tick() + 10 -- Блокировка джойстика/хода на 10 секунд
         TriggerShoot()
     end)
 
     --------------------------------------------------
-    -- ГЛАВНЫЙ ЦИКЛ ОБРАБОТКИ (RENDERSTEPPED)
+    -- ГЛАВНЫЙ ЦИКЛ ОБРАБОТКИ
     --------------------------------------------------
-    local spinAngle = 0
-
     RunService.RenderStepped:Connect(function(dt)
         local character = LocalPlayer.Character
         if character and character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart") then
             local hum = character.Humanoid
             local hrp = character.HumanoidRootPart
 
-            -- Misc: Скорость и Прыжок
-            if hum.WalkSpeed ~= Config.Misc.Speed then hum.WalkSpeed = Config.Misc.Speed end
-            if hum.JumpPower ~= Config.Misc.JumpPower then hum.JumpPower = Config.Misc.JumpPower end
+            -- Блокировка передвижения на 10 сек при клике на FIRE
+            if tick() < joystickLockedUntil then
+                hum.WalkSpeed = 0
+            else
+                hum.WalkSpeed = Config.Misc.Speed
+            end
+
+            hum.JumpPower = Config.Misc.JumpPower
 
             -- Bunnyhop
-            if Config.Misc.Bunnyhop then
+            if Config.Misc.Bunnyhop and tick() >= joystickLockedUntil then
                 if hum.FloorMaterial ~= Enum.Material.Air then
                     hum:ChangeState(Enum.HumanoidStateType.Jumping)
                 end
             end
-
-            -- Anti-Aim
-            if Config.Rage.AntiAim then
-                local targetYaw = hrp.CFrame - hrp.CFrame.Position
-                if Config.Rage.Yaw == "Static" then
-                    targetYaw = CFrame.Angles(0, math.rad(180), 0)
-                elseif Config.Rage.Yaw == "Jitter" then
-                    local jitterVal = (tick() % 0.2 < 0.1) and 90 or -90
-                    targetYaw = CFrame.Angles(0, math.rad(jitterVal), 0)
-                elseif Config.Rage.Yaw == "Spin" then
-                    spinAngle = (spinAngle + dt * 500) % 360
-                    targetYaw = CFrame.Angles(0, math.rad(spinAngle), 0)
-                end
-
-                local pitchVal = 0
-                if Config.Rage.Pitch == "Down" then pitchVal = math.rad(89)
-                elseif Config.Rage.Pitch == "Up" then pitchVal = math.rad(-89)
-                elseif Config.Rage.Pitch == "Zero" then pitchVal = 0
-                elseif Config.Rage.Pitch == "Custom" then pitchVal = math.rad(45) end
-
-                hrp.CFrame = CFrame.new(hrp.Position) * CFrame.Angles(pitchVal, 0, 0) * targetYaw
-            end
         end
 
-        -- Aimbot & Авто-выстрел (с учетом проверки на тимейтов)
+        -- Aimbot / Автовыстрел
         local activeAimbotEnable = Config.Legit.Enable or Config.Rage.Enable
         local activeFov = Config.Legit.Enable and (Config.Legit.FOV * 10) or (Config.Rage.FOV * 10)
 
@@ -616,18 +538,21 @@ local success, errorMessage = pcall(function()
                     Camera.CFrame = currentCFrame:Lerp(targetCFrame, 1 / math.max(Config.Legit.Smoothness, 1))
                 end
 
-                -- Логика автострельбы при наводке на цель
                 if Config.Rage.Enable and Config.Rage.AutoShoot then
                     TriggerShoot()
                 end
             end
         end
 
-        -- Обновление стабильного ВХ
-        UpdateESP()
+        -- Троттлинг ВХ под ~35 кадров в секунду (обновление каждые N итераций)
+        frameCounter = frameCounter + 1
+        if frameCounter >= targetFrameInterval then
+            frameCounter = 0
+            UpdateESP()
+        end
     end)
 
-    -- Плавающая кнопка-значок "N" для сворачивания меню
+    -- Кнопка сворачивания
     local WatermarkGui = Instance.new("ScreenGui")
     WatermarkGui.Name = "NeverloseWatermark"
     WatermarkGui.Parent = PlayerGui

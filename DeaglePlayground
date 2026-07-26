@@ -4,7 +4,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Mobile Combat Suite & DevSpy Hub",
+   Name = "Tornado scripts.win",
    LoadingTitle = "Загрузка модулей...",
    LoadingSubtitle = "by Assistant",
    ConfigurationSaving = {
@@ -34,7 +34,7 @@ local Config = {
         Smoothness = 1,
         TriggerbotEnabled = false,
         DrawFOV = true,
-        WallCheck = true -- Проверка стен для аимбота
+        WallCheck = true
     },
     ESP = {
         Enabled = false,
@@ -86,7 +86,7 @@ local function GetTargetPart(model, preferredType)
     end
 end
 
--- Функция проверки видимости (WallCheck через Raycast)
+-- Функция проверки видимости
 local function IsVisible(targetPart)
     if not Config.Aimbot.WallCheck or _G.WallbangEnabled then return true end
     
@@ -120,7 +120,7 @@ local function IsVisible(targetPart)
 end
 
 --------------------------------------------------------------------------------
--- 4. ЛОГИКА AIMBOT (Поиск ближайшего по дистанции в студах в пределах FOV)
+-- 4. AIMBOT
 --------------------------------------------------------------------------------
 local function GetClosestTarget()
     local closestPart = nil
@@ -262,7 +262,7 @@ PlayerTab:CreateSlider({
 local CombatTab = Window:CreateTab("Оружие & Aimbot 🔫", 4483362458)
 
 CombatTab:CreateToggle({
-   Name = "Включить Rage Aimbot",
+   Name = "Rage Aimbot",
    CurrentValue = Config.Aimbot.Enabled,
    Flag = "AimbotToggle",
    Callback = function(Value)
@@ -271,7 +271,7 @@ CombatTab:CreateToggle({
 })
 
 CombatTab:CreateToggle({
-   Name = "Включить Triggerbot (Автовыстрел)",
+   Name = "Triggerbot (Dont work now)",
    CurrentValue = Config.Aimbot.TriggerbotEnabled,
    Flag = "TriggerbotToggle",
    Callback = function(Value)
@@ -280,7 +280,7 @@ CombatTab:CreateToggle({
 })
 
 CombatTab:CreateToggle({
-   Name = "Проверка стен (WallCheck)",
+   Name = "WallCheck",
    CurrentValue = Config.Aimbot.WallCheck,
    Flag = "WallCheckToggle",
    Callback = function(Value)
@@ -289,7 +289,7 @@ CombatTab:CreateToggle({
 })
 
 CombatTab:CreateToggle({
-   Name = "Отображать FOV круг",
+   Name = "display FOV",
    CurrentValue = Config.Aimbot.DrawFOV,
    Flag = "DrawFOVToggle",
    Callback = function(Value)
@@ -299,7 +299,7 @@ CombatTab:CreateToggle({
 })
 
 CombatTab:CreateDropdown({
-   Name = "Приоритет Цели Aimbot",
+   Name = "Hitbox",
    Options = {"Head", "Body", "Root"},
    CurrentOption = {"Head"},
    MultipleOptions = false,
@@ -310,7 +310,7 @@ CombatTab:CreateDropdown({
 })
 
 CombatTab:CreateSlider({
-   Name = "Aimbot FOV (Радиус захвата)",
+   Name = "Aimbot FOV",
    Range = {50, 800},
    Increment = 10,
    Suffix = "px",
@@ -322,7 +322,7 @@ CombatTab:CreateSlider({
 })
 
 CombatTab:CreateSlider({
-   Name = "Множитель скорострельности",
+   Name = "Rapid fire(dont work)",
    Range = {1, 10},
    Increment = 1,
    Suffix = "x",
@@ -346,15 +346,15 @@ CombatTab:CreateSlider({
 })
 
 CombatTab:CreateToggle({
-   Name = "Урон через стены (Wallbang)",
+   Name = "Wallbang(dont work)",
    CurrentValue = false,
    Flag = "WallbangFlag",
    Callback = function(Value)
       _G.WallbangEnabled = Value
       if Value then
          Rayfield:Notify({
-            Title = "Wallbang Активирован",
-            Content = "Пули теперь игнорируют карты/стены.",
+            Title = "Wallbang active",
+            Content = "Пули теперь игнорируют стены.",
             Duration = 3,
             Image = 4483362458,
          })
@@ -363,7 +363,7 @@ CombatTab:CreateToggle({
 })
 
 CombatTab:CreateToggle({
-   Name = "Увеличенные хитбоксы (Magic Bullets)",
+   Name = "Magic Bullets(dont work)",
    CurrentValue = false,
    Flag = "HitboxExpandFlag",
    Callback = function(Value)
@@ -390,7 +390,7 @@ CombatTab:CreateToggle({
 local VisualsTab = Window:CreateTab("Визуалы (ESP) 👁️", 4483362458)
 
 VisualsTab:CreateToggle({
-   Name = "Включить ESP (Wallhack)",
+   Name = "Wallhack",
    CurrentValue = Config.ESP.Enabled,
    Flag = "ESPToggle",
    Callback = function(Value)
@@ -399,7 +399,7 @@ VisualsTab:CreateToggle({
 })
 
 VisualsTab:CreateToggle({
-   Name = "Подсветка HeadHitbox / BodyHitbox",
+   Name = "HeadHitbox / BodyHitbox",
    CurrentValue = Config.ESP.HighlightHitboxes,
    Flag = "HitboxESPToggle",
    Callback = function(Value)
@@ -413,12 +413,11 @@ VisualsTab:CreateToggle({
 local ToolsTab = Window:CreateTab("Инструменты 🛠️", 4483362458)
 
 ToolsTab:CreateButton({
-   Name = "Запустить DevSpy",
+   Name = "just dont.",
    Callback = function()
-      loadstring(game:HttpGet("https://raw.githubusercontent.com/BestScripterForALL/Ai-menuforRoblox/main/DevSpy"))()
       Rayfield:Notify({
          Title = "DevSpy",
-         Content = "Скрипт DevSpy запущен!",
+         Content = "bro",
          Duration = 3,
          Image = 4483362458,
       })

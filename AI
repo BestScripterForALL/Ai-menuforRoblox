@@ -1,4 +1,4 @@
--- Мобильный чит-ассистент для Roblox v2 (Исправлен API + Скрытый Dex/Spy Анализатор)
+-- Мобильный чит-ассистент для Roblox v3 (Глубокий сканер + Автосохранение API ключа)
 
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
@@ -20,6 +20,17 @@ ScreenGui.Parent = CoreGui
 
 local isMinimized = false
 local apiKey = ""
+local apiKeyFileName = "RobloxAiHub_ApiKey.txt"
+
+-- Автозагрузка сохраненного API ключа при старте
+if isfile and isfile(apiKeyFileName) then
+    local success, savedKey = pcall(function()
+        return readfile(apiKeyFileName)
+    end)
+    if success and savedKey then
+        apiKey = savedKey
+    end
+end
 
 local systemPrompt = [[
 Ты эксперт по разработке читов, экзекуторов и скриптов на Luau для Roblox. 
@@ -92,9 +103,9 @@ Title.Size = UDim2.new(1, -100, 1, 0)
 Title.Position = UDim2.new(0, 15, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "AI Roblox Exploit Hub v2"
+Title.Text = "AI Roblox Exploit Hub v3"
 Title.TextColor3 = Color3.fromRGB(240, 240, 255)
-Title.TextSize = 15
+Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
@@ -207,7 +218,7 @@ local SendCorner = Instance.new("UICorner")
 SendCorner.CornerRadius = UDim.new(0, 8)
 SendCorner.Parent = SendBtn
 
--- Анализ игры (Вместо старого Dex)
+-- Анализ игры
 local DexView = Instance.new("ScrollingFrame")
 DexView.Size = UDim2.new(1, 0, 1, 0)
 DexView.BackgroundTransparency = 1
@@ -241,7 +252,7 @@ local ApiKeyTitle = Instance.new("TextLabel")
 ApiKeyTitle.Size = UDim2.new(1, 0, 0, 20)
 ApiKeyTitle.BackgroundTransparency = 1
 ApiKeyTitle.Font = Enum.Font.GothamBold
-ApiKeyTitle.Text = "Gemini API Key:"
+ApiKeyTitle.Text = "Gemini API Key (Автосохранение):"
 ApiKeyTitle.TextColor3 = Color3.fromRGB(200, 200, 220)
 ApiKeyTitle.TextSize = 13
 ApiKeyTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -253,7 +264,7 @@ ApiKeyInput.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 ApiKeyInput.Font = Enum.Font.Gotham
 ApiKeyInput.PlaceholderText = "Вставь API ключ сюда..."
 ApiKeyInput.PlaceholderColor3 = Color3.fromRGB(100, 100, 120)
-ApiKeyInput.Text = ""
+ApiKeyInput.Text = apiKey -- Устанавливаем загруженный ключ
 ApiKeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 ApiKeyInput.TextSize = 12
 ApiKeyInput.ClearTextOnFocus = false
@@ -263,8 +274,14 @@ local ApiCorner = Instance.new("UICorner")
 ApiCorner.CornerRadius = UDim.new(0, 8)
 ApiCorner.Parent = ApiKeyInput
 
+-- Сохранение ключа в файл при изменении
 ApiKeyInput.FocusLost:Connect(function()
     apiKey = ApiKeyInput.Text
+    if writefile then
+        pcall(function()
+            writefile(apiKeyFileName, apiKey)
+        end)
+    end
 end)
 
 local function switchTab(activeTab)
@@ -336,10 +353,10 @@ local function addMessage(sender, text)
     txt.Parent = msgFrame
 end
 
--- Надежный запрос к Gemini API с исправленной сигнатурой экзекуторов
+-- Запрос к Gemini API
 local function sendToAI(promptText)
     if apiKey == "" then
-        addMessage("System", "Ошибка: Сначала введи API ключ в настройках!")
+        addMessage("System", "Ошибка: Введи API ключ в настройках!")
         switchTab("Settings")
         return
     end
@@ -388,7 +405,7 @@ local function sendToAI(promptText)
             elseif decodedSuccess and decoded and decoded.error then
                 addMessage("System", "API Error: " .. tostring(decoded.error.message))
             else
-                addMessage("AI", "Ошибка ответа ИИ (неверный формат данных). Проверь правильность ключа.")
+                addMessage("AI", "Ошибка ответа ИИ. Проверь ключ.")
             end
         else
             addMessage("System", "Ошибка сети / соединения с Gemini API.")
@@ -404,7 +421,7 @@ SendBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==================== СКРЫТЫЙ АНАЛИЗАТОР ИГРЫ (Делает TXT структуру как в DevEx) ====================
+-- ==================== ГЛУБОКИЙ СКАНЕР ПЛЕЙСА (Папки, Скрипты, Евенты, UI) ====================
 local function createActionCard(title, desc, callback)
     local card = Instance.new("Frame")
     card.Size = UDim2.new(1, 0, 0, 65)
@@ -443,7 +460,7 @@ local function createActionCard(title, desc, callback)
     btn.Position = UDim2.new(1, -100, 0.5, -17)
     btn.BackgroundColor3 = Color3.fromRGB(70, 45, 140)
     btn.Font = Enum.Font.GothamBold
-    btn.Text = "Анализ"
+    btn.Text = "Сканировать"
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.TextSize = 12
     btn.Parent = card
@@ -455,49 +472,82 @@ local function createActionCard(title, desc, callback)
     btn.MouseButton1Click:Connect(callback)
 end
 
-createActionCard("Сканировать плейс в TXT и отправить ИИ", "Скрытно собирает структуру Workspace, ReplicatedStorage, RemoteEvents и создает DevEx-подобный отчет.", function()
+createActionCard("Глубокий анализ плейса в TXT", "Сканирует папки, скрипты, евенты, модели и UI, сохраняет в TXT и отправляет ИИ.", function()
     task.spawn(function()
-        addMessage("System", "Начат скрытый анализ структуры плейса...")
+        addMessage("System", "Запущен глубокий анализ всех объектов плейса...")
         
         local txtLines = {}
-        table.insert(txtLines, "=== DEVEX EXPLORER REPORT (ROBLOX PLACE: " .. tostring(game.PlaceId) .. ") ===")
+        table.insert(txtLines, "=== DEEP DEVEX EXPLORER REPORT (PLACE ID: " .. tostring(game.PlaceId) .. ") ===")
+        table.insert(txtLines, "Дата: " .. os.date("%Y-%m-%d %H:%M:%S") .. "\n")
         
-        -- Функция рекурсивного обхода папок (как в DevEx)
-        local function dumpFolder(parentObj, depth)
-            if depth > 3 then return end -- Ограничение глубины во избежание зависаний
-            local indent = string.rep("  ", depth)
-            for _, child in ipairs(parentObj:GetChildren()) do
-                local line = indent .. "- [" .. child.ClassName .. "] " .. child.Name
-                if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
-                    line = line .. " (REMOTE)"
-                end
-                table.insert(txtLines, line)
-                if #txtLines < 150 then -- Ограничение по объему строк
-                    dumpFolder(child, depth + 1)
+        local function dumpObject(parentObj, depth)
+            local indent = string.rep("  ", math.min(depth, 6))
+            local success, children = pcall(function()
+                return parentObj:GetChildren()
+            end)
+            
+            if success and children then
+                for _, child in ipairs(children) do
+                    local line = indent .. "- [" .. child.ClassName .. "] " .. child.Name
+                    
+                    if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
+                        line = line .. " [🔥 REMOTE]"
+                    elseif child:IsA("LocalScript") or child:IsA("ModuleScript") then
+                        line = line .. " [📜 SCRIPT]"
+                    elseif child:IsA("Folder") then
+                        line = line .. " [📁 FOLDER]"
+                    elseif child:IsA("Model") then
+                        line = line .. " [📦 MODEL]"
+                    elseif child:IsA("Tool") then
+                        line = line .. " [⚔️ TOOL]"
+                    elseif child:IsA("ScreenGui") or child:IsA("Frame") then
+                        line = line .. " [🖼️ UI]"
+                    end
+                    
+                    table.insert(txtLines, line)
+                    
+                    if #txtLines > 700 then
+                        table.insert(txtLines, "... [ПРЕРВАНО: Достиг лимит строк] ...")
+                        return
+                    end
+                    
+                    dumpObject(child, depth + 1)
                 end
             end
         end
         
-        table.insert(txtLines, "[Workspace Children]:")
-        dumpFolder(game:GetService("Workspace"), 1)
+        local servicesToScan = {
+            {name = "Workspace", obj = game:GetService("Workspace")},
+            {name = "ReplicatedStorage", obj = game:GetService("ReplicatedStorage")},
+            {name = "ReplicatedFirst", obj = game:GetService("ReplicatedFirst")},
+            {name = "Players (LocalPlayer)", obj = game:GetService("Players").LocalPlayer},
+            {name = "StarterGui", obj = game:GetService("StarterGui")}
+        }
         
-        table.insert(txtLines, "\n[ReplicatedStorage Children]:")
-        dumpFolder(game:GetService("ReplicatedStorage"), 1)
+        for _, sInfo in ipairs(servicesToScan) do
+            if sInfo.obj then
+                table.insert(txtLines, "\n--- [" .. sInfo.name .. "] ---")
+                dumpObject(sInfo.obj, 1)
+                if #txtLines > 700 then break end
+            end
+        end
         
         local fullReport = table.concat(txtLines, "\n")
         
-        -- Проверка сохранения в файл TXT (если экзекутор поддерживает writefile)
         if writefile then
             pcall(function()
-                writefile("PlaceAnalysis_" .. game.PlaceId .. ".txt", fullReport)
+                writefile("DeepPlaceAnalysis_" .. game.PlaceId .. ".txt", fullReport)
             end)
-            addMessage("System", "TXT файл успешно сохранен в папку экзекутора!")
+            addMessage("System", "Отчет сохранен в файл DeepPlaceAnalysis_" .. game.PlaceId .. ".txt")
         end
         
-        -- Переключаемся в чат и отправляем ИИ с запросом скрипта
         switchTab("Chat")
-        sendToAI("Вот структурированный TXT-отчет DevEx по текущей игре. Напиши рабочий чит-скрипт под эту игру, используя найденные элементы:\n\n" .. fullReport)
+        sendToAI("Вот полный глубокий TXT-отчет структуры этой игры (папки, скрипты, евенты). Напиши рабочий чит-скрипт под эту игру на его основе:\n\n" .. fullReport)
     end)
 end)
 
-addMessage("System", "Скрипт успешно запущен. Введи API-ключ в настройках и используй сканер!")
+if apiKey ~= "" then
+    addMessage("System", "API ключ успешно загружен из памяти устройства!")
+else
+    addMessage("System", "Ассистент готов! Введи API-ключ в настройках (он сохранится автоматически).")
+end

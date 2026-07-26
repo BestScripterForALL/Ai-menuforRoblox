@@ -1,4 +1,4 @@
--- Mobile DevEx Explorer & Parser v2.0 (Tree View + Icons + Fixed Safe/Aggressive Switch)
+-- Mobile DevEx Explorer & Parser v2.1 (Standalone / Full Fix)
 
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
@@ -20,7 +20,7 @@ ScreenGui.Parent = CoreGui
 
 local currentMode = "Safe"
 
--- Главное окно в стиле DevEx (черно-темно-синее)
+-- Главное окно в стиле DevEx
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 460, 0, 320)
@@ -54,7 +54,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "Mobile DevEx Explorer v2.0"
+Title.Text = "Mobile DevEx Explorer v2.1"
 Title.TextColor3 = Color3.fromRGB(210, 210, 230)
 Title.TextSize = 12
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -128,7 +128,7 @@ local function createButton(name, color, order, callback)
     return btn
 end
 
--- Исправленный переключатель режимов Safe / Aggressive
+-- Переключатель режимов Safe / Aggressive (Исправлен)
 local ModeBtn = createButton("Режим: Safe", Color3.fromRGB(30, 80, 50), 1, function()
     if currentMode == "Safe" then
         currentMode = "Aggressive"
@@ -305,7 +305,6 @@ MiniButton.MouseButton1Click:Connect(function()
     MiniButton.Visible = false
 end)
 
--- Функция назначения иконок и цветов для классов в стиле Studio
 local function getClassStyle(className)
     if className == "Workspace" then return "🌍", Color3.fromRGB(80, 160, 255)
     elseif className == "Players" then return "👥", Color3.fromRGB(90, 200, 120)
@@ -324,7 +323,6 @@ local function getClassStyle(className)
     end
 end
 
--- Рекурсивное создание дерева с разворачиванием по [+]
 local function createTreeNode(obj, parentContainer, depth)
     local success, children = pcall(function() return obj:GetChildren() end)
     if not success then return end
@@ -339,7 +337,6 @@ local function createTreeNode(obj, parentContainer, depth)
 
     local indent = math.min(depth * 12, 140)
 
-    -- Кнопка разворачивания [+] / [-]
     local expandBtn = nil
     if hasChildren then
         expandBtn = Instance.new("TextButton")
@@ -369,7 +366,6 @@ local function createTreeNode(obj, parentContainer, depth)
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = itemFrame
 
-    -- Кнопка просмотра содержимого скрипта или значения данных [⚙]
     local isScript = obj:IsA("LocalScript") or obj:IsA("ModuleScript") or obj:IsA("Script")
     local isDataVal = obj:IsA("ValueBase") or obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")
 
@@ -427,7 +423,6 @@ local function createTreeNode(obj, parentContainer, depth)
         end)
     end
 
-    -- Логика раскрытия подпапок по клику на [+]
     if hasChildren then
         local isExpanded = false
         local childContainer = Instance.new("Frame")
@@ -445,7 +440,7 @@ local function createTreeNode(obj, parentContainer, depth)
         expandBtn.MouseButton1Click:Connect(function()
             isExpanded = not isExpanded
             childContainer.Visible = isExpanded
-            expandBtn.Text = isExpanded and "-" : "+"
+            expandBtn.Text = isExpanded and "-" or "+"
             if isExpanded and #childContainer:GetChildren() <= 1 then
                 for _, subChild in ipairs(children) do
                     createTreeNode(subChild, childContainer, depth + 1)
@@ -455,7 +450,6 @@ local function createTreeNode(obj, parentContainer, depth)
     end
 end
 
--- Кнопка: Сохранить весь мир в TXT
 createButton("📦 Полный эксплор в TXT", Color3.fromRGB(60, 45, 120), 2, function()
     task.spawn(function()
         local txtLines = {}
@@ -504,13 +498,12 @@ createButton("📦 Полный эксплор в TXT", Color3.fromRGB(60, 45, 1
                 writefile(fileName, report)
                 Title.Text = "Сохранено: " .. fileName
                 task.wait(3)
-                Title.Text = "Mobile DevEx Explorer v2.0"
+                Title.Text = "Mobile DevEx Explorer v2.1"
             end)
         end
     end)
 end)
 
--- Кнопка: Обновить корень Explorer
 createButton("🔄 Обновить Explorer", Color3.fromRGB(40, 90, 60), 3, function()
     for _, ch in ipairs(ExplorerFrame:GetChildren()) do
         if ch:IsA("Frame") then ch:Destroy() end
@@ -535,7 +528,6 @@ createButton("🔄 Обновить Explorer", Color3.fromRGB(40, 90, 60), 3, fu
     end
 end)
 
--- Первичная инициализация дерева при запуске
 local initialServices = {
     game:GetService("Workspace"),
     game:GetService("Players"),

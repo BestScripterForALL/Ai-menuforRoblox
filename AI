@@ -1,4 +1,4 @@
--- Мобильный чит-ассистент для Roblox v3 (Глубокий сканер + Автосохранение API ключа)
+-- Мобильный чит-ассистент для Roblox v4 (Умная перезапись TXT + Текстовая передача в ИИ)
 
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
@@ -22,7 +22,7 @@ local isMinimized = false
 local apiKey = ""
 local apiKeyFileName = "RobloxAiHub_ApiKey.txt"
 
--- Автозагрузка сохраненного API ключа при старте
+-- Автозагрузка API ключа
 if isfile and isfile(apiKeyFileName) then
     local success, savedKey = pcall(function()
         return readfile(apiKeyFileName)
@@ -103,7 +103,7 @@ Title.Size = UDim2.new(1, -100, 1, 0)
 Title.Position = UDim2.new(0, 15, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "AI Roblox Exploit Hub v3"
+Title.Text = "AI Roblox Exploit Hub v4"
 Title.TextColor3 = Color3.fromRGB(240, 240, 255)
 Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -264,7 +264,7 @@ ApiKeyInput.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 ApiKeyInput.Font = Enum.Font.Gotham
 ApiKeyInput.PlaceholderText = "Вставь API ключ сюда..."
 ApiKeyInput.PlaceholderColor3 = Color3.fromRGB(100, 100, 120)
-ApiKeyInput.Text = apiKey -- Устанавливаем загруженный ключ
+ApiKeyInput.Text = apiKey
 ApiKeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 ApiKeyInput.TextSize = 12
 ApiKeyInput.ClearTextOnFocus = false
@@ -274,7 +274,6 @@ local ApiCorner = Instance.new("UICorner")
 ApiCorner.CornerRadius = UDim.new(0, 8)
 ApiCorner.Parent = ApiKeyInput
 
--- Сохранение ключа в файл при изменении
 ApiKeyInput.FocusLost:Connect(function()
     apiKey = ApiKeyInput.Text
     if writefile then
@@ -353,7 +352,6 @@ local function addMessage(sender, text)
     txt.Parent = msgFrame
 end
 
--- Запрос к Gemini API
 local function sendToAI(promptText)
     if apiKey == "" then
         addMessage("System", "Ошибка: Введи API ключ в настройках!")
@@ -361,7 +359,7 @@ local function sendToAI(promptText)
         return
     end
     
-    addMessage("You", promptText)
+    addMessage("You", "Отчет плейса отправлен в ИИ для анализа...")
     
     task.spawn(function()
         local requestFunc = syn and syn.request or http_request or request
@@ -421,7 +419,7 @@ SendBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==================== ГЛУБОКИЙ СКАНЕР ПЛЕЙСА (Папки, Скрипты, Евенты, UI) ====================
+-- ==================== СКАНЕР С ПЕРЕЗАПИСЬЮ ФАЙЛА И ТЕКСТОВОЙ ПЕРЕДАЧЕЙ ====================
 local function createActionCard(title, desc, callback)
     local card = Instance.new("Frame")
     card.Size = UDim2.new(1, 0, 0, 65)
@@ -472,12 +470,12 @@ local function createActionCard(title, desc, callback)
     btn.MouseButton1Click:Connect(callback)
 end
 
-createActionCard("Глубокий анализ плейса в TXT", "Сканирует папки, скрипты, евенты, модели и UI, сохраняет в TXT и отправляет ИИ.", function()
+createActionCard("Глубокий анализ (Перезапись TXT)", "Сканирует плейс, перезаписывает файл (НазваниеЧита_ID.txt) и передает отчет ИИ.", function()
     task.spawn(function()
-        addMessage("System", "Запущен глубокий анализ всех объектов плейса...")
+        addMessage("System", "Сканирование структуры плейса...")
         
         local txtLines = {}
-        table.insert(txtLines, "=== DEEP DEVEX EXPLORER REPORT (PLACE ID: " .. tostring(game.PlaceId) .. ") ===")
+        table.insert(txtLines, "=== DEVEX EXPLORER REPORT (PLACE ID: " .. tostring(game.PlaceId) .. ") ===")
         table.insert(txtLines, "Дата: " .. os.date("%Y-%m-%d %H:%M:%S") .. "\n")
         
         local function dumpObject(parentObj, depth)
@@ -506,8 +504,8 @@ createActionCard("Глубокий анализ плейса в TXT", "Скан�
                     
                     table.insert(txtLines, line)
                     
-                    if #txtLines > 700 then
-                        table.insert(txtLines, "... [ПРЕРВАНО: Достиг лимит строк] ...")
+                    if #txtLines > 650 then
+                        table.insert(txtLines, "... [ПРЕРВАНО: Лимит строк отчета] ...")
                         return
                     end
                     
@@ -528,26 +526,32 @@ createActionCard("Глубокий анализ плейса в TXT", "Скан�
             if sInfo.obj then
                 table.insert(txtLines, "\n--- [" .. sInfo.name .. "] ---")
                 dumpObject(sInfo.obj, 1)
-                if #txtLines > 700 then break end
+                if #txtLines > 650 then break end
             end
         end
         
         local fullReport = table.concat(txtLines, "\n")
         
+        -- Умная запись/перезапись файла: НазваниеЧита_IDплейса.txt
+        local exploitName = "AiRobloxHub"
+        local fileName = exploitName .. "_" .. tostring(game.PlaceId) .. ".txt"
+        
         if writefile then
             pcall(function()
-                writefile("DeepPlaceAnalysis_" .. game.PlaceId .. ".txt", fullReport)
+                -- writefile автоматически перезаписывает файл, если он уже существовал, либо создает новый
+                writefile(fileName, fullReport)
+                addMessage("System", "Файл успешно сохранен/перезаписан: " .. fileName)
             end)
-            addMessage("System", "Отчет сохранен в файл DeepPlaceAnalysis_" .. game.PlaceId .. ".txt")
         end
         
+        -- Поскольку Gemini не принимает файлы напрямую, передаем весь отчет в текстовом виде через промпт
         switchTab("Chat")
-        sendToAI("Вот полный глубокий TXT-отчет структуры этой игры (папки, скрипты, евенты). Напиши рабочий чит-скрипт под эту игру на его основе:\n\n" .. fullReport)
+        sendToAI("Вот структурированный TXT-отчет игры (сохранен в файл " .. fileName .. "). На основе этой структуры напиши готовый чит-скрипт под эту игру:\n\n" .. fullReport)
     end)
 end)
 
 if apiKey ~= "" then
-    addMessage("System", "API ключ успешно загружен из памяти устройства!")
+    addMessage("System", "API ключ загружен из памяти устройства!")
 else
-    addMessage("System", "Ассистент готов! Введи API-ключ в настройках (он сохранится автоматически).")
+    addMessage("System", "Ассистент готов! Введи API-ключ в настройках.")
 end

@@ -1,10 +1,10 @@
 --------------------------------------------------------------------------------
--- 1. ИНИЦИАЛИЗАЦИЯ ИНФЕРФЕЙСА (RAYFIELD)
+-- 1. ИНИЦИАЛИЗАЦИЯ ИНТЕРФЕЙСА (RAYFIELD)
 --------------------------------------------------------------------------------
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Mobile Combat Suite & World Modulation",
+   Name = "Mobile Combat Suite & DevSpy Hub",
    LoadingTitle = "Загрузка модулей...",
    LoadingSubtitle = "by Assistant",
    ConfigurationSaving = {
@@ -20,7 +20,6 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local Lighting = game:GetService("Lighting")
 local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
@@ -30,12 +29,12 @@ _G.BigHitboxes = false
 local Config = {
     Aimbot = {
         Enabled = false,
-        TargetPart = "Head",
+        TargetPart = "Head", -- "Head", "Body", "Root"
         FOV = 350,
         Smoothness = 1,
         TriggerbotEnabled = false,
         DrawFOV = true,
-        WallCheck = true
+        WallCheck = true -- Проверка стен для аимбота
     },
     ESP = {
         Enabled = false,
@@ -43,14 +42,6 @@ local Config = {
         BoxColor = Color3.fromRGB(255, 0, 0),
         HeadColor = Color3.fromRGB(0, 255, 0),
         BodyColor = Color3.fromRGB(0, 150, 255)
-    },
-    WorldModulation = {
-        ColorFilterEnabled = false,
-        FilterColor = Color3.fromRGB(255, 255, 255),
-        TracerEnabled = false,
-        TracerRainbow = false,
-        TracerColor = Color3.fromRGB(255, 0, 0),
-        MovementTrailEnabled = false
     }
 }
 
@@ -67,13 +58,8 @@ FOVCircle.Color = Color3.fromRGB(255, 0, 0)
 FOVCircle.Thickness = 1
 FOVCircle.Filled = false
 
--- Создание объекта ColorCorrectionEffect для глобального цвета мира
-local ColorCorrection = Instance.new("ColorCorrectionEffect")
-ColorCorrection.Parent = Lighting
-ColorCorrection.Enabled = false
-
 --------------------------------------------------------------------------------
--- 3. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ И МОДИФИКАЦИИ МИРА
+-- 3. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ПОИСКА И ПРОВЕРОК
 --------------------------------------------------------------------------------
 local function GetCharacterParts(model)
     if not model or not model:IsA("Model") then return nil end
@@ -100,6 +86,7 @@ local function GetTargetPart(model, preferredType)
     end
 end
 
+-- Функция проверки видимости (WallCheck через Raycast)
 local function IsVisible(targetPart)
     if not Config.Aimbot.WallCheck or _G.WallbangEnabled then return true end
     
@@ -110,6 +97,7 @@ local function IsVisible(targetPart)
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Exclude
     
+    -- Игнорируем себя и модели игроков/клиентский вьюмодел
     local ignoreList = {character, workspace:FindFirstChild("ClientViewmodel")}
     for _, obj in ipairs(Workspace:GetChildren()) do
         if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
@@ -120,6 +108,7 @@ local function IsVisible(targetPart)
 
     local result = Workspace:Raycast(origin, direction, raycastParams)
     if result then
+        -- Если луч задел что-то до цели, значит цель за стеной
         local hitInstance = result.Instance
         if hitInstance:IsDescendantOf(targetPart.Parent) then
             return true
@@ -130,40 +119,12 @@ local function IsVisible(targetPart)
     return true
 end
 
--- Логика движения и радужного трейла от игрока (живет 3 секунды)
-local activeTrailAttachment0 = nil
-local activeTrailAttachment1 = nil
-local activeTrail = nil
-
-local function SetupMovementTrail()
-    local character = LocalPlayer.Character
-    if not character then return end
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return end
-
-    if activeTrail then activeTrail:Destroy() end
-    if activeTrailAttachment0 then activeTrailAttachment0:Destroy() end
-    if activeTrailAttachment1 then activeTrailAttachment1:Destroy() end
-
-    activeTrailAttachment0 = Instance.new("Attachment", rootPart)
-    activeTrailAttachment0.Position = Vector3.new(0, -1, 0)
-    activeTrailAttachment1 = Instance.new("Attachment", rootPart)
-    activeTrailAttachment1.Position = Vector3.new(0, 1, 0)
-
-    activeTrail = Instance.new("Trail")
-    activeTrail.Attachment0 = activeTrailAttachment0
-    activeTrail.Attachment1 = activeTrailAttachment1
-    activeTrail.Lifetime = 3.0 -- Треил пропадает ровно через 3 секунды
-    activeTrail.WidthScale = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(1, 0)})
-    activeTrail.Parent = rootPart
-end
-
 --------------------------------------------------------------------------------
--- 4. ЛОГИКА AIMBOT, ESP И ТРЕЙСЕРОВ
+-- 4. ЛОГИКА AIMBOT (Поиск ближайшего по дистанции в студах в пределах FOV)
 --------------------------------------------------------------------------------
 local function GetClosestTarget()
     local closestPart = nil
-    local shortestDistance3D = math.huge 
+    local shortestDistance3D = math.huge -- Поиск абсолютного лидера по дистанции в студах (внутри FOV)
     local viewportCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
     for _, obj in ipairs(Workspace:GetChildren()) do
@@ -177,9 +138,11 @@ local function GetClosestTarget()
                     if onScreen then
                         local mouseDistance = (Vector2.new(screenPos.X, screenPos.Y) - viewportCenter).Magnitude
                         
+                        -- Проверяем, что цель находится в пределах FOV и видна (если включен WallCheck)
                         if mouseDistance <= Config.Aimbot.FOV and IsVisible(targetPart) then
                             local distance3D = (targetPart.Position - Camera.CFrame.Position).Magnitude
                             
+                            -- Выбираем строго самую близкую цель в студах с динамическим переключением
                             if distance3D < shortestDistance3D then
                                 shortestDistance3D = distance3D
                                 closestPart = targetPart
@@ -388,6 +351,14 @@ CombatTab:CreateToggle({
    Flag = "WallbangFlag",
    Callback = function(Value)
       _G.WallbangEnabled = Value
+      if Value then
+         Rayfield:Notify({
+            Title = "Wallbang Активирован",
+            Content = "Пули теперь игнорируют карты/стены.",
+            Duration = 3,
+            Image = 4483362458,
+         })
+      end
    end,
 })
 
@@ -397,6 +368,7 @@ CombatTab:CreateToggle({
    Flag = "HitboxExpandFlag",
    Callback = function(Value)
       _G.BigHitboxes = Value
+      
       task.spawn(function()
          while _G.BigHitboxes do
             task.wait(0.5)
@@ -438,70 +410,6 @@ VisualsTab:CreateToggle({
    end,
 })
 
--- === НОВАЯ ВКЛАДКА: WORLD MODULATION & VISUAL FX ===
-local WorldModTab = Window:CreateTab("World Modulation 🌍", 4483362458)
-
-WorldModTab:CreateToggle({
-   Name = "Глобальный фильтр цвета мира",
-   CurrentValue = Config.WorldModulation.ColorFilterEnabled,
-   Flag = "WorldFilterToggle",
-   Callback = function(Value)
-      Config.WorldModulation.ColorFilterEnabled = Value
-      ColorCorrection.Enabled = Value
-   end,
-})
-
-WorldModTab:CreateColorPicker({
-   Name = "Цвет фильтра мира",
-   Default = Config.WorldModulation.FilterColor,
-   Flag = "WorldFilterColor",
-   Callback = function(Color)
-      Config.WorldModulation.FilterColor = Color
-      ColorCorrection.TintColor = Color
-   end,
-})
-
-WorldModTab:CreateToggle({
-   Name = "Трейсеры от пуль",
-   CurrentValue = Config.WorldModulation.TracerEnabled,
-   Flag = "BulletTracerToggle",
-   Callback = function(Value)
-      Config.WorldModulation.TracerEnabled = Value
-   end,
-})
-
-WorldModTab:CreateToggle({
-   Name = "Радужные трейсеры пуль",
-   CurrentValue = Config.WorldModulation.TracerRainbow,
-   Flag = "TracerRainbowToggle",
-   Callback = function(Value)
-      Config.WorldModulation.TracerRainbow = Value
-   end,
-})
-
-WorldModTab:CreateColorPicker({
-   Name = "Цвет трейсеров пуль",
-   Default = Config.WorldModulation.TracerColor,
-   Flag = "TracerColorPicker",
-   Callback = function(Color)
-      Config.WorldModulation.TracerColor = Color
-   end,
-})
-
-WorldModTab:CreateToggle({
-   Name = "Радужный треил от движения (3 сек)",
-   CurrentValue = Config.WorldModulation.MovementTrailEnabled,
-   Flag = "MovementTrailToggle",
-   Callback = function(Value)
-      Config.WorldModulation.MovementTrailEnabled = Value
-      if Value then
-         SetupMovementTrail()
-      else
-         if activeTrail then activeTrail:Destroy() end
-      end
-   end,
-})
-
 local ToolsTab = Window:CreateTab("Инструменты 🛠️", 4483362458)
 
 ToolsTab:CreateButton({
@@ -532,44 +440,6 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
       end
    end
 
-   -- Перехват выстрелов или визуализация трейсеров пуль
-   if Config.WorldModulation.TracerEnabled and (method == "FireServer" or method == "InvokeServer") then
-      pcall(function()
-         local char = LocalPlayer.Character
-         local tool = char and char:FindFirstChildOfClass("Tool")
-         if tool and (self.Name == "Shoot" or self.Name == "Fire" or method == "FireServer") then
-            local muzzle = tool:FindFirstChild("Muzzle") or tool:FindFirstChildHandle() or tool:FindFirstChildOfClass("BasePart")
-            if muzzle then
-               local targetPart = GetClosestTarget()
-               local endPos = targetPart and targetPart.Position or (muzzle.Position + Camera.CFrame.LookVector * 100)
-               
-               local tracer = Drawing.new("Line")
-               tracer.Visible = true
-               tracer.Thickness = 2
-               tracer.Color = Config.WorldModulation.TracerRainbow and Color3.fromHSV(tick() % 5 / 5, 1, 1) or Config.WorldModulation.TracerColor
-               
-               task.spawn(function()
-                  for i = 1, 30 do
-                     local screenPos1, on1 = Camera:WorldToViewportPoint(muzzle.Position)
-                     local screenPos2, on2 = Camera:WorldToViewportPoint(endPos)
-                     if on1 and on2 then
-                        tracer.From = Vector2.new(screenPos1.X, screenPos1.Y)
-                        tracer.To = Vector2.new(screenPos2.X, screenPos2.Y)
-                        if Config.WorldModulation.TracerRainbow then
-                           tracer.Color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
-                        end
-                     else
-                        tracer.Visible = false
-                     end
-                     RunService.RenderStepped:Wait()
-                  end
-                  tracer:Remove()
-               end)
-            end
-         end
-      end)
-   end
-
    return oldNamecall(self, unpack(args))
 end)
 
@@ -592,13 +462,6 @@ RunService.RenderStepped:Connect(function()
     FOVCircle.Visible = Config.Aimbot.DrawFOV
     FOVCircle.Radius = Config.Aimbot.FOV
     FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
-    -- Динамическое обновление радужного цвета трейла от игрока
-    if Config.WorldModulation.MovementTrailEnabled and activeTrail then
-        local hue = tick() % 5 / 5
-        local rainbowColor = Color3.fromHSV(hue, 1, 1)
-        activeTrail.Color = ColorSequence.new(rainbowColor)
-    end
 
     if Config.Aimbot.Enabled then
         local targetPart = GetClosestTarget()
@@ -649,11 +512,4 @@ end)
 
 Workspace.ChildRemoved:Connect(function(child)
     ClearESP(child)
-end)
-
-LocalPlayer.CharacterAdded:Connect(function()
-    if Config.WorldModulation.MovementTrailEnabled then
-        task.wait(1)
-        SetupMovementTrail()
-    end
 end)

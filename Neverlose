@@ -1,0 +1,121 @@
+-- Neverlose UI Library Style for Roblox / Client Lua
+-- Имитация интерфейса Neverlose CS2
+
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+-- Удаляем старое меню, если оно есть
+if CoreGui:FindFirstChild("NeverloseMenu") then
+    CoreGui.NeverloseMenu:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "NeverloseMenu"
+ScreenGui.Parent = CoreGui
+ScreenGui.IgnoreGuiInset = true
+
+-- Главное окно
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22) -- Фирменный темно-серый фон Neverlose
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
+MainFrame.Size = UDim2.new(0, 600, 0, 400)
+
+-- Закругление углов окна
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 6)
+UICorner.Parent = MainFrame
+
+-- Шапка меню (Topbar)
+local TopBar = Instance.new("Frame")
+TopBar.Parent = MainFrame
+TopBar.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
+TopBar.Size = UDim2.new(1, 0, 0, 35)
+TopBar.BorderSizePixel = 0
+
+local TopBarCorner = Instance.new("UICorner")
+TopBarCorner.CornerRadius = UDim.new(0, 6)
+TopBarCorner.Parent = TopBar
+
+-- Название / Логотип в стиле Neverlose
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Parent = TopBar
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Position = UDim2.new(0, 15, 0, 0)
+TitleLabel.Size = UDim2.new(0, 200, 1, 0)
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.Text = "neverlose"
+TitleLabel.TextColor3 = Color3.fromRGB(120, 110, 255) -- Фирменный сине-фиолетовый акцент
+TitleLabel.TextSize = 16
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local SubTitle = Instance.new("TextLabel")
+SubTitle.Parent = TitleLabel
+SubTitle.BackgroundTransparency = 1
+SubTitle.Position = UDim2.new(0, 78, 0, 0)
+SubTitle.Size = UDim2.new(0, 100, 1, 0)
+SubTitle.Font = Enum.Font.Gotham
+SubTitle.Text = ".cc"
+SubTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+SubTitle.TextSize = 16
+SubTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Контейнер для вкладок (Tabs)
+local TabContainer = Instance.new("Frame")
+TabContainer.Parent = MainFrame
+TabContainer.BackgroundTransparency = 1
+TabContainer.Position = UDim2.new(0, 0, 0, 35)
+TabContainer.Size = UDim2.new(0, 120, 1, -35)
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = TabContainer
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 5)
+
+-- Функция создания вкладки
+local function createTab(name, order)
+    движимыйКнопка = Instance.new("TextButton")
+    движимыйКнопка.Parent = TabContainer
+    движимыйКнопка.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+    движимыйКнопка.BorderSizePixel = 0
+    движимыйКнопка.Size = UDim2.new(1, 0, 0, 30)
+    движимыйКнопка.Font = Enum.Font.GothamSemibold
+    движимыйКнопка.Text = name
+    движимыйКнопка.TextColor3 = Color3.fromRGB(150, 150, 160)
+    движимыйКнопка.TextSize = 13
+    движимыйКнопка.LayoutOrder = order
+    return движимыйКнопка
+end
+
+-- Основные вкладки Neverlose CS2
+createTab("Rage", 1)
+createTab("Legit", 2)
+createTab("Visuals", 3)
+createTab("Misc", 4)
+createTab("Configs", 5)
+createTab("Scripts", 6)
+
+-- Перетаскивание окна мышкой (Drag Logic)
+local dragging, dragInput, dragStart, startPos
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)

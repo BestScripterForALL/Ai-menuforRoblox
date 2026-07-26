@@ -1,22 +1,22 @@
--- Защищенный загрузчик Neverlose Mobile UI Library (Full UI)
+-- Защищенный загрузчик Neverlose Mobile UI Library (PlayerGui Fixed)
 local success, errorMessage = pcall(function()
-    local CoreGui = game:GetService("CoreGui")
+    local Players = game:GetService("Players")
     local UserInputService = game:GetService("UserInputService")
     local TweenService = game:GetService("TweenService")
-    local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
+    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
     -- Удаляем старые копии интерфейса
-    if CoreGui:FindFirstChild("NeverloseMobileMenu") then
-        CoreGui.NeverloseMobileMenu:Destroy()
+    if PlayerGui:FindFirstChild("NeverloseMobileMenu") then
+        PlayerGui.NeverloseMobileMenu:Destroy()
     end
-    if CoreGui:FindFirstChild("NeverloseWatermark") then
-        CoreGui.NeverloseWatermark:Destroy()
+    if PlayerGui:FindFirstChild("NeverloseWatermark") then
+        PlayerGui.NeverloseWatermark:Destroy()
     end
 
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "NeverloseMobileMenu"
-    ScreenGui.Parent = CoreGui
+    ScreenGui.Parent = PlayerGui
     ScreenGui.IgnoreGuiInset = true
     ScreenGui.ResetOnSpawn = false
 
@@ -84,7 +84,7 @@ local success, errorMessage = pcall(function()
     HideCorner.CornerRadius = UDim.new(0, 4)
     HideCorner.Parent = HideButton
 
-    -- Контейнер для списка вкладок (слева)
+    -- Контейнер для вкладок
     local TabContainer = Instance.new("ScrollingFrame")
     TabContainer.Parent = MainFrame
     TabContainer.BackgroundTransparency = 1
@@ -98,7 +98,7 @@ local success, errorMessage = pcall(function()
     UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
     UIListLayout.Padding = UDim.new(0, 4)
 
-    -- Контейнер для отображения контента выбранной вкладки (справа)
+    -- Контейнер контента
     local ContentContainer = Instance.new("Frame")
     ContentContainer.Parent = MainFrame
     ContentContainer.BackgroundTransparency = 1
@@ -109,7 +109,6 @@ local success, errorMessage = pcall(function()
     local Pages = {}
 
     local function createTab(name, order)
-        -- Кнопка вкладки
         local TabButton = Instance.new("TextButton")
         TabButton.Parent = TabContainer
         TabButton.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
@@ -126,7 +125,6 @@ local success, errorMessage = pcall(function()
         BtnCorner.CornerRadius = UDim.new(0, 4)
         BtnCorner.Parent = TabButton
 
-        -- Страница для контента вкладки
         local Page = Instance.new("ScrollingFrame")
         Page.Name = name .. "Page"
         Page.Parent = ContentContainer
@@ -157,7 +155,6 @@ local success, errorMessage = pcall(function()
         table.insert(Tabs, TabButton)
         table.insert(Pages, Page)
 
-        -- Делаем первую вкладку активной по умолчанию
         if order == 1 then
             Page.Visible = true
             TabButton.TextColor3 = Color3.fromRGB(120, 110, 255)
@@ -166,7 +163,6 @@ local success, errorMessage = pcall(function()
         return Page
     end
 
-    -- Создаем основные вкладки
     local RagePage = createTab("Rage", 1)
     local LegitPage = createTab("Legit", 2)
     local VisualsPage = createTab("Visuals", 3)
@@ -175,7 +171,7 @@ local success, errorMessage = pcall(function()
     local ScriptsPage = createTab("Scripts", 6)
     local DevTab = createTab("Dev", 7)
 
-    -- Функция добавления чекбокса (тоггла)
+    -- Чекбокс
     local function AddToggle(parent, title, defaultState, callback)
         local state = defaultState
         local ToggleBtn = Instance.new("TextButton")
@@ -219,7 +215,7 @@ local success, errorMessage = pcall(function()
         end)
     end
 
-    -- Функция добавления слайдера
+    -- Слайдер
     local function AddSlider(parent, title, min, max, default, callback)
         local val = default
         local SliderFrame = Instance.new("Frame")
@@ -307,24 +303,22 @@ local success, errorMessage = pcall(function()
         end)
     end
 
-    -- Заполняем вкладку Rage
+    -- Наполнение элементов
     AddToggle(RagePage, "Enable Ragebot", true, function(v) print("Rage:", v) end)
     AddToggle(RagePage, "Auto Shoot", false, function(v) print("Auto Shoot:", v) end)
     AddSlider(RagePage, "Field of View", 1, 180, 45, function(v) print("FOV:", v) end)
 
-    -- Заполняем вкладку Legit
     AddToggle(LegitPage, "Enable Legitbot", false, function(v) print("Legit:", v) end)
     AddSlider(LegitPage, "Smoothness", 1, 20, 5, function(v) print("Smooth:", v) end)
 
-    -- Заполняем вкладку Visuals
     AddToggle(VisualsPage, "Player ESP", true, function(v) print("ESP:", v) end)
     AddToggle(VisualsPage, "Box Outline", true, function(v) print("Box:", v) end)
     AddSlider(VisualsPage, "Max Distance", 50, 500, 250, function(v) print("Dist:", v) end)
 
-    -- Плавающая кнопка-значок "N" для возврата меню
+    -- Плавающая кнопка-значок "N"
     local WatermarkGui = Instance.new("ScreenGui")
     WatermarkGui.Name = "NeverloseWatermark"
-    WatermarkGui.Parent = CoreGui
+    WatermarkGui.Parent = PlayerGui
     WatermarkGui.IgnoreGuiInset = true
     WatermarkGui.ResetOnSpawn = false
     WatermarkGui.Enabled = false
@@ -345,7 +339,6 @@ local success, errorMessage = pcall(function()
     WatermarkCorner.CornerRadius = UDim.new(0, 8)
     WatermarkCorner.Parent = WatermarkBtn
 
-    -- Логика скрытия/показа
     HideButton.MouseButton1Click:Connect(function()
         MainFrame.Visible = false
         WatermarkGui.Enabled = true
@@ -356,13 +349,12 @@ local success, errorMessage = pcall(function()
         WatermarkGui.Enabled = false
     end)
 
-    -- Функция выгрузки (Удаление меню через вкладку Dev)
     DevTab.MouseButton1Click:Connect(function()
         ScreenGui:Destroy()
         WatermarkGui:Destroy()
     end)
 
-    -- Перетаскивание главного окна
+    -- Перетаскивание
     local draggingMain, dragStartMain, startPosMain
     TopBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -372,7 +364,6 @@ local success, errorMessage = pcall(function()
         end
     end)
 
-    -- Перетаскивание плавающей кнопки N
     local draggingWm, dragStartWm, startPosWm
     WatermarkBtn.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then

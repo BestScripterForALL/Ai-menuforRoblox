@@ -1,4 +1,4 @@
--- Mobile AI Exploit Hub v6.5 (Тотальный сканер + Токены + Очистка чата + Авто-запуск + Системные роли)
+-- Mobile AI Exploit Hub v7.0 (Тотальный сканер + Токены + Очистка чата + Авто-запуск + Системные роли + Редактор)
 
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
@@ -40,7 +40,7 @@ local systemPrompt = [[
 Важно: Всегда выделяй готовый Lua-код с помощью блоков markdown: ```lua ... ``` чтобы система могла распознать его и дать пользователю кнопку копирования и автозапуска!
 ]]
 
--- Таблица для хранения истории сообщений (нужна для очистки чата и токенов)
+-- Таблица для хранения истории сообщений
 local chatHistory = {}
 
 -- ==================== ГЛАВНОЕ ОКНО ====================
@@ -100,7 +100,7 @@ Title.Size = UDim2.new(1, -100, 1, 0)
 Title.Position = UDim2.new(0, 15, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "AI Exploit Hub v6.5"
+Title.Text = "AI Exploit Hub v7.0"
 Title.TextColor3 = Color3.fromRGB(240, 240, 255)
 Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -120,10 +120,10 @@ local MinCorner = Instance.new("UICorner")
 MinCorner.CornerRadius = UDim.new(0, 8)
 MinCorner.Parent = MinimizeBtn
 
--- Вкладки
+-- Вкладки (теперь 4 вкладки: Чат, Редактор, Анализ, Настройки)
 local TabBar = Instance.new("Frame")
-TabBar.Size = UDim2.new(1, -20, 0, 35)
-TabBar.Position = UDim2.new(0, 10, 0, 55)
+TabBar.Size = UDim2.new(1, -10, 0, 35)
+TabBar.Position = UDim2.new(0, 5, 0, 55)
 TabBar.BackgroundTransparency = 1
 TabBar.Parent = MainFrame
 
@@ -131,17 +131,17 @@ local UIListLayout = Instance.new("UIListLayout")
 UIListLayout.FillDirection = Enum.FillDirection.Horizontal
 UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Padding = UDim.new(0, 8)
+UIListLayout.Padding = UDim.new(0, 4)
 UIListLayout.Parent = TabBar
 
 local function createTabButton(name, order)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 105, 1, 0)
+    btn.Size = UDim2.new(0, 83, 1, 0)
     btn.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
     btn.Font = Enum.Font.GothamMedium
     btn.Text = name
     btn.TextColor3 = Color3.fromRGB(180, 180, 200)
-    btn.TextSize = 13
+    btn.TextSize = 11
     btn.LayoutOrder = order
     btn.Parent = TabBar
     
@@ -152,8 +152,9 @@ local function createTabButton(name, order)
 end
 
 local ChatTabBtn = createTabButton("AI Чат", 1)
-local DexTabBtn = createTabButton("Анализ игры", 2)
-local SettingsTabBtn = createTabButton("Настройки", 3)
+local EditorTabBtn = createTabButton("Редактор", 2)
+local DexTabBtn = createTabButton("Анализ", 3)
+local SettingsTabBtn = createTabButton("Настройки", 4)
 
 -- Контейнеры
 local ContentContainer = Instance.new("Frame")
@@ -169,7 +170,6 @@ ChatView.BackgroundTransparency = 1
 ChatView.Visible = true
 ChatView.Parent = ContentContainer
 
--- Верхняя панель чата (Индикатор токенов и кнопка Очистить)
 local ChatTopBar = Instance.new("Frame")
 ChatTopBar.Size = UDim2.new(1, 0, 0, 28)
 ChatTopBar.BackgroundTransparency = 1
@@ -179,7 +179,7 @@ local TokenLabel = Instance.new("TextLabel")
 TokenLabel.Size = UDim2.new(0.5, 0, 1, 0)
 TokenLabel.BackgroundTransparency = 1
 TokenLabel.Font = Enum.Font.GothamMedium
-TokenLabel.Text = "💬 Токенов в памяти: ~0"
+TokenLabel.Text = "💬 Токенов: ~0"
 TokenLabel.TextColor3 = Color3.fromRGB(140, 140, 170)
 TokenLabel.TextSize = 11
 TokenLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -246,6 +246,100 @@ local SendCorner = Instance.new("UICorner")
 SendCorner.CornerRadius = UDim.new(0, 8)
 SendCorner.Parent = SendBtn
 
+-- ==================== ВКЛАДКА РЕДАКТОРА КОДА ====================
+local EditorView = Instance.new("Frame")
+EditorView.Size = UDim2.new(1, 0, 1, 0)
+EditorView.BackgroundTransparency = 1
+EditorView.Visible = false
+EditorView.Parent = ContentContainer
+
+local EditorScroll = Instance.new("ScrollingFrame")
+EditorScroll.Size = UDim2.new(1, 0, 1, -48)
+EditorScroll.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+EditorScroll.BorderSizePixel = 0
+EditorScroll.CanvasSize = UDim2.new(0, 0, 2, 0)
+EditorScroll.ScrollBarThickness = 4
+EditorScroll.Parent = EditorView
+
+local EditorCorner = Instance.new("UICorner")
+EditorCorner.CornerRadius = UDim.new(0, 8)
+EditorCorner.Parent = EditorScroll
+
+local CodeInput = Instance.new("TextBox")
+CodeInput.Size = UDim2.new(1, -10, 1, -10)
+CodeInput.Position = UDim2.new(0, 5, 0, 5)
+CodeInput.BackgroundTransparency = 1
+CodeInput.Font = Enum.Font.Code
+CodeInput.MultiLine = true
+CodeInput.ClearTextOnFocus = false
+CodeInput.PlaceholderText = "-- Вставь или напиши Lua-скрипт сюда...\nprint('Hello from Mobile AI Hub!')"
+CodeInput.PlaceholderColor3 = Color3.fromRGB(90, 90, 110)
+CodeInput.Text = ""
+CodeInput.TextColor3 = Color3.fromRGB(220, 220, 240)
+CodeInput.TextSize = 12
+CodeInput.TextXAlignment = Enum.TextXAlignment.Left
+CodeInput.TextYAlignment = Enum.TextYAlignment.Top
+CodeInput.Parent = EditorScroll
+
+-- Панель кнопок редактора (Запуск, Очистка, Сохранить)
+local EditorBottomBar = Instance.new("Frame")
+EditorBottomBar.Size = UDim2.new(1, 0, 0, 40)
+EditorBottomBar.Position = UDim2.new(0, 0, 1, -40)
+EditorBottomBar.BackgroundTransparency = 1
+EditorBottomBar.Parent = EditorView
+
+local EBtnLayout = Instance.new("UIListLayout")
+EBtnLayout.FillDirection = Enum.FillDirection.Horizontal
+EBtnLayout.SortOrder = Enum.SortOrder.LayoutOrder
+EBtnLayout.Padding = UDim.new(0, 6)
+EBtnLayout.Parent = EditorBottomBar
+
+local function createEditorButton(name, color, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.32, -4, 1, 0)
+    btn.BackgroundColor3 = color
+    btn.Font = Enum.Font.GothamBold
+    btn.Text = name
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 11
+    btn.Parent = EditorBottomBar
+    
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = btn
+    
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+createEditorButton("▶️ Запустить", Color3.fromRGB(40, 120, 70), function()
+    local code = CodeInput.Text
+    if code == "" then return end
+    local fn, syntaxErr = loadstring(code)
+    if not fn then
+        warn("Editor Syntax Error: " .. tostring(syntaxErr))
+        return
+    end
+    pcall(fn)
+end)
+
+createEditorButton("🗑️ Очистить", Color3.fromRGB(120, 40, 40), function()
+    CodeInput.Text = ""
+end)
+
+createEditorButton("💾 В файл", Color3.fromRGB(70, 45, 140), function()
+    local code = CodeInput.Text
+    if code == "" then return end
+    if writefile then
+        local fileName = "SavedScript_" .. math.random(1000, 9999) .. ".lua"
+        pcall(function()
+            writefile(fileName, code)
+            CodeInput.PlaceholderText = "Сохранено как " .. fileName
+            CodeInput.Text = ""
+        end)
+    end
+end)
+
 -- Анализ игры
 local DexView = Instance.new("ScrollingFrame")
 DexView.Size = UDim2.new(1, 0, 1, 0)
@@ -261,7 +355,7 @@ DexLayout.SortOrder = Enum.SortOrder.LayoutOrder
 DexLayout.Padding = UDim.new(0, 8)
 DexLayout.Parent = DexView
 
--- Настройки (С ключом и выбором ролей/промптов)
+-- Настройки
 local SettingsView = Instance.new("ScrollingFrame")
 SettingsView.Size = UDim2.new(1, 0, 1, 0)
 SettingsView.BackgroundTransparency = 1
@@ -349,15 +443,18 @@ createRoleButton("💡 Простые пояснения", "Объясняй в�
 
 local function switchTab(activeTab)
     ChatView.Visible = (activeTab == "Chat")
+    EditorView.Visible = (activeTab == "Editor")
     DexView.Visible = (activeTab == "Dex")
     SettingsView.Visible = (activeTab == "Settings")
     
     ChatTabBtn.BackgroundColor3 = (activeTab == "Chat") and Color3.fromRGB(60, 40, 120) or Color3.fromRGB(30, 30, 42)
+    EditorTabBtn.BackgroundColor3 = (activeTab == "Editor") and Color3.fromRGB(60, 40, 120) or Color3.fromRGB(30, 30, 42)
     DexTabBtn.BackgroundColor3 = (activeTab == "Dex") and Color3.fromRGB(60, 40, 120) or Color3.fromRGB(30, 30, 42)
     SettingsTabBtn.BackgroundColor3 = (activeTab == "Settings") and Color3.fromRGB(60, 40, 120) or Color3.fromRGB(30, 30, 42)
 end
 
 ChatTabBtn.MouseButton1Click:Connect(function() switchTab("Chat") end)
+EditorTabBtn.MouseButton1Click:Connect(function() switchTab("Editor") end)
 DexTabBtn.MouseButton1Click:Connect(function() switchTab("Dex") end)
 SettingsTabBtn.MouseButton1Click:Connect(function() switchTab("Settings") end)
 
@@ -395,18 +492,15 @@ MiniButton.MouseButton1Click:Connect(function()
     isMinimized = false
 end)
 
--- Обновление счетчика токенов по истории
 local function updateTokenCounter()
     local totalChars = 0
     for _, msg in ipairs(chatHistory) do
         totalChars = totalChars + #msg.text
     end
-    -- Приблизительная оценка: 1 токен ~= 4 символа текста
     local estimatedTokens = math.floor(totalChars / 4)
-    TokenLabel.Text = "💬 Токенов в памяти: ~" .. estimatedTokens
+    TokenLabel.Text = "💬 Токенов: ~" .. estimatedTokens
 end
 
--- Очистка чата
 ClearChatBtn.MouseButton1Click:Connect(function()
     for _, child in ipairs(ChatScroll:GetChildren()) do
         if child:IsA("Frame") then
@@ -418,7 +512,6 @@ ClearChatBtn.MouseButton1Click:Connect(function()
     addMessage("System", "История чата и контекст памяти полностью очищены!")
 end)
 
--- Добавление сообщений с кнопками "Копировать" и "Запустить"
 local function addMessage(sender, text)
     table.insert(chatHistory, {sender = sender, text = text})
     updateTokenCounter()
@@ -439,20 +532,16 @@ local function addMessage(sender, text)
     txt.AutomaticSize = Enum.AutomaticSize.Y
     txt.BackgroundTransparency = 1
     txt.Font = Enum.Font.Gotham
-    txt.Text = sender .. ": " + text -- Безопасное отображение
+    txt.Text = sender .. ": " .. text
     txt.TextColor3 = (sender == "AI") and Color3.fromRGB(200, 180, 255) or Color3.fromRGB(230, 230, 240)
     txt.TextSize = 12
     txt.TextXAlignment = Enum.TextXAlignment.Left
     txt.TextWrapped = true
     txt.Parent = msgFrame
-    
-    -- Исправление конкатенации в TextLabel
-    txt.Text = sender .. ": " .. text
 
     local codeSnippet = text:match("```lua%s*(.-)%s*```") or text:match("```%s*(.-)%s*```")
 
     if sender == "AI" and codeSnippet then
-        -- Контейнер для кнопок под кодом
         local btnContainer = Instance.new("Frame")
         btnContainer.Size = UDim2.new(1, -10, 0, 28)
         btnContainer.BackgroundTransparency = 1
@@ -461,15 +550,14 @@ local function addMessage(sender, text)
         local bLayout = Instance.new("UIListLayout")
         bLayout.FillDirection = Enum.FillDirection.Horizontal
         bLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        bLayout.Padding = UDim.new(0, 6)
+        bLayout.Padding = UDim.new(0, 4)
         bLayout.Parent = btnContainer
 
-        -- Кнопка копирования
         local copyBtn = Instance.new("TextButton")
-        copyBtn.Size = UDim2.new(0.48, 0, 1, 0)
+        copyBtn.Size = UDim2.new(0.32, 0, 1, 0)
         copyBtn.BackgroundColor3 = Color3.fromRGB(70, 45, 140)
         copyBtn.Font = Enum.Font.GothamBold
-        copyBtn.Text = "📋 Скопировать"
+        copyBtn.Text = "📋 Копировать"
         copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         copyBtn.TextSize = 10
         copyBtn.Parent = btnContainer
@@ -482,20 +570,36 @@ local function addMessage(sender, text)
             local setclip = setclipboard or toclipboard or set_clipboard
             if setclip then
                 setclip(codeSnippet)
-                copyBtn.Text = "✅ Скопировано!"
+                copyBtn.Text = "✅ Готово"
                 task.wait(2)
-                copyBtn.Text = "📋 Скопировать"
-            else
-                copyBtn.Text = "❌ Нет setclipboard"
+                copyBtn.Text = "📋 Копировать"
             end
         end)
 
-        -- Кнопка автозапуска (Execute через loadstring + pcall)
+        -- Отправить в Редактор
+        local toEditorBtn = Instance.new("TextButton")
+        toEditorBtn.Size = UDim2.new(0.32, 0, 1, 0)
+        toEditorBtn.BackgroundColor3 = Color3.fromRGB(45, 90, 140)
+        toEditorBtn.Font = Enum.Font.GothamBold
+        toEditorBtn.Text = "✏️ В редактор"
+        toEditorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        toEditorBtn.TextSize = 10
+        toEditorBtn.Parent = btnContainer
+
+        local teCorner = Instance.new("UICorner")
+        teCorner.CornerRadius = UDim.new(0, 6)
+        teCorner.Parent = toEditorBtn
+
+        toEditorBtn.MouseButton1Click:Connect(function()
+            CodeInput.Text = codeSnippet
+            switchTab("Editor")
+        end)
+
         local execBtn = Instance.new("TextButton")
-        execBtn.Size = UDim2.new(0.48, 0, 1, 0)
+        execBtn.Size = UDim2.new(0.32, 0, 1, 0)
         execBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
         execBtn.Font = Enum.Font.GothamBold
-        execBtn.Text = "▶️ Запустить"
+        execBtn.Text = "▶️ Запуск"
         execBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         execBtn.TextSize = 10
         execBtn.Parent = btnContainer
@@ -505,32 +609,8 @@ local function addMessage(sender, text)
         eCorner.Parent = execBtn
 
         execBtn.MouseButton1Click:Connect(function()
-            local fn, syntaxError = loadstring(codeSnippet)
-            if not fn then
-                execBtn.Text = "❌ Ошибка синтаксиса"
-                execBtn.BackgroundColor3 = Color3.fromRGB(140, 40, 40)
-                addMessage("System", "Ошибка загрузки кода: " .. tostring(syntaxError))
-                task.wait(2)
-                execBtn.Text = "▶️ Запустить"
-                execBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
-                return
-            end
-            
-            local success, runtimeError = pcall(fn)
-            if success then
-                execBtn.Text = "✅ Успешно запущен!"
-                execBtn.BackgroundColor3 = Color3.fromRGB(30, 150, 70)
-                task.wait(2)
-                execBtn.Text = "▶️ Запустить"
-                execBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
-            else
-                execBtn.Text = "❌ Ошибка выполнения"
-                execBtn.BackgroundColor3 = Color3.fromRGB(140, 40, 40)
-                addMessage("System", "Ошибка при выполнении кода скрипта: " .. tostring(runtimeError))
-                task.wait(2)
-                execBtn.Text = "▶️ Запустить"
-                execBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
-            end
+            local fn = loadstring(codeSnippet)
+            if fn then pcall(fn) end
         end)
     end
 end
@@ -602,7 +682,7 @@ SendBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==================== ТОТАЛЬНЫЙ СКАНЕР ВСЕХ ПАПОК ====================
+-- ==================== ТОТАЛЬНЫЙ СКАНЕР ====================
 local function createActionCard(title, desc, callback)
     local card = Instance.new("Frame")
     card.Size = UDim2.new(1, 0, 0, 65)

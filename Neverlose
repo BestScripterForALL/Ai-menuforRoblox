@@ -1,209 +1,334 @@
--- Защищенный загрузчик Neverlose Mobile UI Library
-local success, errorMessage = pcall(function()
-    local CoreGui = game:GetService("CoreGui")
-    local UserInputService = game:GetService("UserInputService")
-    local TweenService = game:GetService("TweenService")
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
+-- Neverlose UI Framework for Roblox (Mobile/Executor Compatible)
+-- Target Format: .txt / Script File
 
-    -- Удаляем старые копии интерфейса
-    if CoreGui:FindFirstChild("NeverloseMobileMenu") then
-        CoreGui.NeverloseMobileMenu:Destroy()
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui") or CoreGui
+
+-- Удаляем старое меню, если оно уже запущено
+if CoreGui:FindFirstChild("NeverloseMenu") then
+    CoreGui.NeverloseMenu:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "NeverloseMenu"
+ScreenGui.Parent = CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Главное окно меню
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.5, -250, 0.5, -175)
+MainFrame.Size = UDim2.new(0, 500, 0, 350)
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 6)
+MainCorner.Parent = MainFrame
+
+-- Шапка меню (Drag & Drop для мобильных/ПК)
+local TopBar = Instance.new("Frame")
+TopBar.Parent = MainFrame
+TopBar.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+TopBar.BorderSizePixel = 0
+TopBar.Size = UDim2.new(1, 0, 0, 35)
+
+local TopCorner = Instance.new("UICorner")
+TopCorner.CornerRadius = UDim.new(0, 6)
+TopCorner.Parent = TopBar
+
+local Title = Instance.new("TextLabel")
+Title.Parent = TopBar
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 15, 0, 0)
+Title.Size = UDim2.new(0, 200, 1, 0)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "neverlose.cc <font color='#7c3aed'>[preview]</font>"
+Title.RichText = true
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Контейнер для вкладок (Tabs Header)
+local TabContainer = Instance.new("Frame")
+TabContainer.Parent = MainFrame
+TabContainer.BackgroundTransparency = 1
+TabContainer.Position = UDim2.new(0, 15, 0, 45)
+TabContainer.Size = UDim2.new(1, -30, 0, 30)
+
+local TabListLayout = Instance.new("UIListLayout")
+TabListLayout.Parent = TabContainer
+TabListLayout.FillDirection = Enum.FillDirection.Horizontal
+TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabListLayout.Padding = UDim.new(0, 8)
+
+-- Контейнер для страниц
+local ContentContainer = Instance.new("Frame")
+ContentContainer.Parent = MainFrame
+ContentContainer.BackgroundTransparency = 1
+ContentContainer.Position = UDim2.new(0, 15, 0, 85)
+ContentContainer.Size = UDim2.new(1, -30, 1, -95)
+
+local Tabs = {}
+local Pages = {}
+
+local function CreateTab(name, index)
+    -- Кнопка вкладки
+    local TabButton = Instance.new("TextButton")
+    TabButton.Parent = TabContainer
+    TabButton.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    TabButton.BorderSizePixel = 0
+    TabButton.Size = UDim2.new(0, 105, 0, 28)
+    TabButton.AutoButtonColor = false
+    TabButton.Font = Enum.Font.GothamMedium
+    TabButton.Text = name
+    TabButton.TextColor3 = Color3.fromRGB(130, 130, 145)
+    TabButton.TextSize = 12
+
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 4)
+    BtnCorner.Parent = TabButton
+
+    -- Страница вкладки
+    local Page = Instance.new("ScrollingFrame")
+    Page.Name = name .. "Page"
+    Page.Parent = ContentContainer
+    Page.BackgroundTransparency = 1
+    Page.BorderSizePixel = 0
+    Page.Size = UDim2.new(1, 0, 1, 0)
+    Page.Visible = (index == 1)
+    Page.CanvasSize = UDim2.new(0, 0, 0, 0)
+    Page.ScrollBarThickness = 3
+    Page.ScrollBarImageColor3 = Color3.fromRGB(124, 58, 237)
+
+    local PageLayout = Instance.new("UIListLayout")
+    PageLayout.Parent = Page
+    PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    PageLayout.Padding = UDim.new(0, 8)
+
+    TabButton.MouseButton1Click:Connect(function()
+        for _, p in pairs(Pages) do
+            p.Visible = false
+        end
+        for _, t in pairs(Tabs) do
+            TweenService:Create(t, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(25, 25, 35),
+                TextColor3 = Color3.fromRGB(130, 130, 145)
+            }:Play()
+        end
+        Page.Visible = true
+        TweenService:Create(TabButton, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(124, 58, 237),
+            TextColor3 = Color3.fromRGB(255, 255, 255)
+        }):Play()
+    end)
+
+    if index == 1 then
+        TabButton.BackgroundColor3 = Color3.fromRGB(124, 58, 237)
+        TabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     end
-    if CoreGui:FindFirstChild("NeverloseWatermark") then
-        CoreGui.NeverloseWatermark:Destroy()
-    end
 
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "NeverloseMobileMenu"
-    ScreenGui.Parent = CoreGui
-    ScreenGui.IgnoreGuiInset = true
-    ScreenGui.ResetOnSpawn = false
+    table.insert(Tabs, TabButton)
+    table.insert(Pages, Page)
 
-    -- Главное компактное окно для телефонов (непрозрачность 90% / BackgroundTransparency = 0.1)
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "MainFrame"
-    MainFrame.Parent = ScreenGui
-    MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
-    MainFrame.BackgroundTransparency = 0.1
-    MainFrame.BorderSizePixel = 0
-    MainFrame.Position = UDim2.new(0.5, -175, 0.5, -125)
-    MainFrame.Size = UDim2.new(0, 350, 0, 250)
+    return Page
+end
 
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 6)
-    UICorner.Parent = MainFrame
+-- Создаем вкладки
+local AimbotPage = CreateTab("Aimbot", 1)
+local VisualsPage = CreateTab("Visuals", 2)
+local SkinsPage = CreateTab("Skins", 3)
+local MiscPage = CreateTab("Misc", 4)
 
-    -- Шапка меню (Topbar)
-    local TopBar = Instance.new("Frame")
-    TopBar.Parent = MainFrame
-    TopBar.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
-    TopBar.BackgroundTransparency = 0.1
-    TopBar.Size = UDim2.new(1, 0, 0, 30)
-    TopBar.BorderSizePixel = 0
-
-    local TopBarCorner = Instance.new("UICorner")
-    TopBarCorner.CornerRadius = UDim.new(0, 6)
-    TopBarCorner.Parent = TopBar
-
-    -- Логотип
-    local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Parent = TopBar
-    TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Position = UDim2.new(0, 10, 0, 0)
-    TitleLabel.Size = UDim2.new(0, 150, 1, 0)
-    TitleLabel.Font = Enum.Font.GothamBold
-    TitleLabel.Text = "neverlose"
-    TitleLabel.TextColor3 = Color3.fromRGB(120, 110, 255)
-    TitleLabel.TextSize = 14
-    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-    local SubTitle = Instance.new("TextLabel")
-    SubTitle.Parent = TitleLabel
-    SubTitle.BackgroundTransparency = 1
-    SubTitle.Position = UDim2.new(0, 68, 0, 0)
-    SubTitle.Size = UDim2.new(0, 50, 1, 0)
-    SubTitle.Font = Enum.Font.Gotham
-    SubTitle.Text = ".cc"
-    SubTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    SubTitle.TextSize = 14
-    SubTitle.TextXAlignment = Enum.TextXAlignment.Left
-
-    -- Кнопка скрытия меню в букву N
-    local HideButton = Instance.new("TextButton")
-    HideButton.Parent = TopBar
-    HideButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-    HideButton.Position = UDim2.new(1, -26, 0.5, -10)
-    HideButton.Size = UDim2.new(0, 20, 0, 20)
-    HideButton.Font = Enum.Font.GothamBold
-    HideButton.Text = "-"
-    HideButton.TextColor3 = Color3.fromRGB(200, 200, 200)
-    HideButton.TextSize = 12
-
-    local HideCorner = Instance.new("UICorner")
-    HideCorner.CornerRadius = UDim.new(0, 4)
-    HideCorner.Parent = HideButton
-
-    -- Контейнер для вкладок
-    local TabContainer = Instance.new("ScrollingFrame")
-    TabContainer.Parent = MainFrame
-    TabContainer.BackgroundTransparency = 1
-    TabContainer.Position = UDim2.new(0, 0, 0, 35)
-    TabContainer.Size = UDim2.new(0, 90, 1, -35)
-    TabContainer.CanvasSize = UDim2.new(0, 0, 0, 210)
-    TabContainer.ScrollBarThickness = 2
-
-    local UIListLayout = Instance.new("UIListLayout")
-    UIListLayout.Parent = TabContainer
-    UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    UIListLayout.Padding = UDim.new(0, 4)
-
-    local function createTab(name, order)
-        local TabButton = Instance.new("TextButton")
-        TabButton.Parent = TabContainer
-        TabButton.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
-        TabButton.BackgroundTransparency = 0.2
-        TabButton.BorderSizePixel = 0
-        TabButton.Size = UDim2.new(1, 0, 0, 26)
-        TabButton.Font = Enum.Font.GothamSemibold
-        TabButton.Text = name
-        TabButton.TextColor3 = Color3.fromRGB(150, 150, 160)
-        TabButton.TextSize = 11
-        TabButton.LayoutOrder = order
-        return TabButton
-    end
-
-    createTab("Rage", 1)
-    createTab("Legit", 2)
-    createTab("Visuals", 3)
-    createTab("Misc", 4)
-    createTab("Configs", 5)
-    createTab("Scripts", 6)
+-- Функция создания чекбокса
+local function AddToggle(parent, title, defaultState, callback)
+    local toggled = defaultState
     
-    -- Вкладка Dev
-    local DevTab = createTab("Dev", 7)
+    local ToggleFrame = Instance.new("TextButton")
+    ToggleFrame.Parent = parent
+    ToggleFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+    ToggleFrame.BorderSizePixel = 0
+    ToggleFrame.Size = UDim2.new(1, 0, 0, 32)
+    ToggleFrame.AutoButtonColor = false
+    ToggleFrame.Text = ""
 
-    -- Плавающая кнопка-значок "N" для возврата меню
-    local WatermarkGui = Instance.new("ScreenGui")
-    WatermarkGui.Name = "NeverloseWatermark"
-    WatermarkGui.Parent = CoreGui
-    WatermarkGui.IgnoreGuiInset = true
-    WatermarkGui.ResetOnSpawn = false
-    WatermarkGui.Enabled = false
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 4)
+    Corner.Parent = ToggleFrame
 
-    local WatermarkBtn = Instance.new("TextButton")
-    WatermarkBtn.Name = "NButton"
-    WatermarkBtn.Parent = WatermarkGui
-    WatermarkBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
-    WatermarkBtn.BackgroundTransparency = 0.2
-    WatermarkBtn.Position = UDim2.new(0, 50, 0, 50)
-    WatermarkBtn.Size = UDim2.new(0, 35, 0, 35)
-    WatermarkBtn.Font = Enum.Font.GothamBold
-    WatermarkBtn.Text = "N"
-    WatermarkBtn.TextColor3 = Color3.fromRGB(120, 110, 255)
-    WatermarkBtn.TextSize = 18
+    local Label = Instance.new("TextLabel")
+    Label.Parent = ToggleFrame
+    Label.BackgroundTransparency = 1
+    Label.Position = UDim2.new(0, 12, 0, 0)
+    Label.Size = UDim2.new(0, 300, 1, 0)
+    Label.Font = Enum.Font.Gotham
+    Label.Text = title
+    Label.TextColor3 = Color3.fromRGB(200, 200, 210)
+    Label.TextSize = 12
+    Label.TextXAlignment = Enum.TextXAlignment.Left
 
-    local WatermarkCorner = Instance.new("UICorner")
-    WatermarkCorner.CornerRadius = UDim.new(0, 8)
-    WatermarkCorner.Parent = WatermarkBtn
+    local Box = Instance.new("Frame")
+    Box.Parent = ToggleFrame
+    Box.BackgroundColor3 = toggled and Color3.fromRGB(124, 58, 237) or Color3.fromRGB(35, 35, 45)
+    Box.Position = UDim2.new(1, -28, 0.5, -8)
+    Box.Size = UDim2.new(0, 16, 0, 16)
 
-    -- Логика скрытия/показа
-    HideButton.MouseButton1Click:Connect(function()
-        MainFrame.Visible = false
-        WatermarkGui.Enabled = true
+    local BoxCorner = Instance.new("UICorner")
+    BoxCorner.CornerRadius = UDim.new(0, 3)
+    BoxCorner.Parent = Box
+
+    ToggleFrame.MouseButton1Click:Connect(function()
+        toggled = not toggled
+        TweenService:Create(Box, TweenInfo.new(0.15), {
+            BackgroundColor3 = toggled and Color3.fromRGB(124, 58, 237) or Color3.fromRGB(35, 35, 45)
+        }):Play()
+        if callback then callback(toggled) end
     end)
+end
 
-    WatermarkBtn.MouseButton1Click:Connect(function()
-        MainFrame.Visible = true
-        WatermarkGui.Enabled = false
-    end)
+-- Функция создания слайдера (упрощенная для стабильности на мобильных)
+local function AddSlider(parent, title, min, max, default, callback)
+    local value = default
 
-    -- Функция выгрузки (Удаление меню и функций)
-    DevTab.MouseButton1Click:Connect(function()
-        ScreenGui:Destroy()
-        WatermarkGui:Destroy()
-    end)
+    local SliderFrame = Instance.new("Frame")
+    SliderFrame.Parent = parent
+    SliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+    SliderFrame.BorderSizePixel = 0
+    SliderFrame.Size = UDim2.new(1, 0, 0, 45)
 
-    -- Перетаскивание главного окна
-    local draggingMain, dragStartMain, startPosMain
-    TopBar.InputBegan:Connect(function(input)
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 4)
+    Corner.Parent = SliderFrame
+
+    local Label = Instance.new("TextLabel")
+    Label.Parent = SliderFrame
+    Label.BackgroundTransparency = 1
+    Label.Position = UDim2.new(0, 12, 0, 6)
+    Label.Size = UDim2.new(1, -24, 0, 15)
+    Label.Font = Enum.Font.Gotham
+    Label.Text = title
+    Label.TextColor3 = Color3.fromRGB(200, 200, 210)
+    Label.TextSize = 12
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local ValueLabel = Instance.new("TextLabel")
+    ValueLabel.Parent = SliderFrame
+    ValueLabel.BackgroundTransparency = 1
+    ValueLabel.Position = UDim2.new(1, -112, 0, 6)
+    ValueLabel.Size = UDim2.new(0, 100, 0, 15)
+    ValueLabel.Font = Enum.Font.GothamMedium
+    ValueLabel.Text = tostring(default)
+    ValueLabel.TextColor3 = Color3.fromRGB(124, 58, 237)
+    ValueLabel.TextSize = 12
+    ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+
+    local SliderBar = Instance.new("TextButton")
+    SliderBar.Parent = SliderFrame
+    SliderBar.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    SliderBar.BorderSizePixel = 0
+    SliderBar.Position = UDim2.new(0, 12, 0, 28)
+    SliderBar.Size = UDim2.new(1, -24, 0, 6)
+    SliderBar.AutoButtonColor = false
+    SliderBar.Text = ""
+
+    local BarCorner = Instance.new("UICorner")
+    BarCorner.CornerRadius = UDim.new(0, 3)
+    BarCorner.Parent = SliderBar
+
+    local Fill = Instance.new("Frame")
+    Fill.Parent = SliderBar
+    Fill.BackgroundColor3 = Color3.fromRGB(124, 58, 237)
+    Fill.BorderSizePixel = 0
+    Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+
+    local FillCorner = Instance.new("UICorner")
+    FillCorner.CornerRadius = UDim.new(0, 3)
+    FillCorner.Parent = Fill
+
+    local dragging = false
+
+    local function Update(input)
+        local pos = UDim2.new(math.clamp((input.Position.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1), 0, 1, 0)
+        Fill.Size = pos
+        local newVal = math.floor(min + ((max - min) * pos.X.Scale))
+        ValueLabel.Text = tostring(newVal)
+        if callback then callback(newVal) end
+    end
+
+    SliderBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingMain = true
-            dragStartMain = input.Position
-            startPosMain = MainFrame.Position
-        end
-    end)
-
-    -- Перетаскивание плавающей кнопки N
-    local draggingWm, dragStartWm, startPosWm
-    WatermarkBtn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingWm = true
-            dragStartWm = input.Position
-            startPosWm = WatermarkBtn.Position
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            if draggingMain then
-                local delta = input.Position - dragStartMain
-                MainFrame.Position = UDim2.new(startPosMain.X.Scale, startPosMain.X.Offset + delta.X, startPosMain.Y.Scale, startPosMain.Y.Offset + delta.Y)
-            elseif draggingWm then
-                local delta = input.Position - dragStartWm
-                WatermarkBtn.Position = UDim2.new(startPosWm.X.Scale, startPosWm.X.Offset + delta.X, startPosWm.Y.Scale, startPosWm.Y.Offset + delta.Y)
-            end
+            dragging = true
+            Update(input)
         end
     end)
 
     UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingMain = false
-            draggingWm = false
+            dragging = false
         end
     end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            Update(input)
+        end
+    end)
+end
+
+-- Заполнение вкладки Aimbot
+AddToggle(AimbotPage, "Enable Aimbot", true, function(v) print("Aimbot:", v) end)
+AddToggle(AimbotPage, "Auto Shoot", false, function(v) print("Auto Shoot:", v) end)
+AddToggle(AimbotPage, "Silent Aim", false, function(v) print("Silent Aim:", v) end)
+AddSlider(AimbotPage, "Field of View", 1, 30, 5, function(v) print("FOV:", v) end)
+AddSlider(AimbotPage, "Smoothing", 1, 100, 15, function(v) print("Smoothing:", v) end)
+
+-- Заполнение вкладки Visuals
+AddToggle(VisualsPage, "Enable ESP", true, function(v) print("ESP:", v) end)
+AddToggle(VisualsPage, "Box Outline", true, function(v) print("Box:", v) end)
+AddToggle(VisualsPage, "Health Bar", true, function(v) print("Health:", v) end)
+AddSlider(VisualsPage, "Max Distance", 50, 500, 250, function(v) print("Distance:", v) end)
+
+-- Заполнение вкладки Skins
+AddToggle(SkinsPage, "Override Skins", false, function(v) print("Skins:", v) end)
+AddSlider(SkinsPage, "Wear Value", 0, 100, 0, function(v) print("Wear:", v) end)
+
+-- Заполнение вкладки Misc
+AddToggle(MiscPage, "Watermark", true, function(v) print("Watermark:", v) end)
+AddToggle(MiscPage, "Keybind List", true, function(v) print("Keybinds:", v) end)
+AddSlider(MiscPage, "Menu Scale", 50, 150, 100, function(v) print("Scale:", v) end)
+
+-- Перетаскивание всего окна (Dragging)
+local draggingWindow, dragInput, dragStart, startPos
+
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingWindow = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                draggingWindow = false
+            end
+        end)
+    end
 end)
 
-if not success then
-    warn("Ошибка инициализации интерфейса: " .. tostring(errorMessage))
-end
+TopBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and draggingWindow then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)

@@ -1,4 +1,4 @@
--- Защищенный загрузчик Neverlose Mobile UI Library (Full Functional)
+-- Защищенный загрузчик Neverlose Mobile UI Library (Advanced Features)
 local success, errorMessage = pcall(function()
     local Players = game:GetService("Players")
     local UserInputService = game:GetService("UserInputService")
@@ -15,12 +15,19 @@ local success, errorMessage = pcall(function()
         PlayerGui.NeverloseWatermark:Destroy()
     end
 
-    -- Таблица состояния читов (логика работы)
+    -- Таблица конфигурации читов
     local Config = {
-        Rage = { Enable = false, AutoShoot = false, FOV = 45 },
-        Legit = { Enable = false, Smoothness = 5, FOV = 15, Bone = "Head" },
+        Rage = { 
+            Enable = false, 
+            AutoShoot = false, 
+            FOV = 45,
+            AntiAim = false,
+            Pitch = "Zero", -- Down, Up, Zero, Custom
+            Yaw = "Static"  -- Static, Jitter, Spin
+        },
+        Legit = { Enable = false, Smoothness = 5, FOV = 15 },
         Visuals = { ESP = true, BoxOutline = true, MaxDist = 250 },
-        Misc = { Watermark = true, Speed = 16, JumpPower = 50 },
+        Misc = { Bunnyhop = false, Speed = 16, JumpPower = 50 },
         Configs = { Selected = "Default" }
     }
 
@@ -180,7 +187,7 @@ local success, errorMessage = pcall(function()
     local ConfigsPage = createTab("Configs", 5)
     local DevTab = createTab("Dev", 6)
 
-    -- Чекбокс
+    -- UI Компоненты (Чекбокс, Слайдер, Дропдаун/Селектор)
     local function AddToggle(parent, title, defaultState, callback)
         local state = defaultState
         local ToggleBtn = Instance.new("TextButton")
@@ -224,7 +231,6 @@ local success, errorMessage = pcall(function()
         end)
     end
 
-    -- Слайдер
     local function AddSlider(parent, title, min, max, default, callback)
         local val = default
         local SliderFrame = Instance.new("Frame")
@@ -312,40 +318,85 @@ local success, errorMessage = pcall(function()
         end)
     end
 
+    local function AddDropdown(parent, title, options, default, callback)
+        local currentIdx = 1
+        for i, opt in ipairs(options) do
+            if opt == default then currentIdx = i break end
+        end
+
+        local DropBtn = Instance.new("TextButton")
+        DropBtn.Parent = parent
+        DropBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
+        DropBtn.BackgroundTransparency = 0.3
+        DropBtn.Size = UDim2.new(1, -6, 0, 28)
+        DropBtn.AutoButtonColor = false
+        DropBtn.Text = ""
+        DropBtn.BorderSizePixel = 0
+
+        local Corner = Instance.new("UICorner")
+        Corner.CornerRadius = UDim.new(0, 4)
+        Corner.Parent = DropBtn
+
+        local Label = Instance.new("TextLabel")
+        Label.Parent = DropBtn
+        Label.BackgroundTransparency = 1
+        Label.Position = UDim2.new(0, 8, 0, 0)
+        Label.Size = UDim2.new(0, 100, 1, 0)
+        Label.Font = Enum.Font.Gotham
+        Label.Text = title
+        Label.TextColor3 = Color3.fromRGB(200, 200, 210)
+        Label.TextSize = 10
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+
+        local ValLabel = Instance.new("TextLabel")
+        ValLabel.Parent = DropBtn
+        ValLabel.BackgroundTransparency = 1
+        ValLabel.Position = UDim2.new(1, -110, 0, 0)
+        ValLabel.Size = UDim2.new(0, 100, 1, 0)
+        ValLabel.Font = Enum.Font.GothamBold
+        ValLabel.Text = options[currentIdx]
+        ValLabel.TextColor3 = Color3.fromRGB(120, 110, 255)
+        ValLabel.TextSize = 10
+        ValLabel.TextXAlignment = Enum.TextXAlignment.Right
+
+        DropBtn.MouseButton1Click:Connect(function()
+            currentIdx = currentIdx + 1
+            if currentIdx > #options then currentIdx = 1 end
+            local selected = options[currentIdx]
+            ValLabel.Text = selected
+            if callback then callback(selected) end
+        end)
+    end
+
     --------------------------------------------------
-    -- ЛОГИКА ФУНКЦИЙ (ВКЛАДКИ)
+    -- ЗАПОЛНЕНИЕ ВКЛАДОК И ЛОГИКА
     --------------------------------------------------
 
-    -- 1. Наполнение Rage
+    -- Ragebot & Anti-Aim
     AddToggle(RagePage, "Enable Ragebot", false, function(v) Config.Rage.Enable = v end)
     AddToggle(RagePage, "Auto Shoot", false, function(v) Config.Rage.AutoShoot = v end)
     AddSlider(RagePage, "Field of View", 1, 180, 45, function(v) Config.Rage.FOV = v end)
+    
+    AddToggle(RagePage, "Anti-Aim (AA)", false, function(v) Config.Rage.AntiAim = v end)
+    AddDropdown(RagePage, "AA Pitch", {"Down", "Up", "Zero", "Custom"}, "Zero", function(v) Config.Rage.Pitch = v end)
+    AddDropdown(RagePage, "AA Yaw", {"Static", "Jitter", "Spin"}, "Static", function(v) Config.Rage.Yaw = v end)
 
-    -- 2. Наполнение Legit (Автономный аимбот с настраиваемым smoothness и фовом)
+    -- Legitbot
     AddToggle(LegitPage, "Enable Legitbot", false, function(v) Config.Legit.Enable = v end)
     AddSlider(LegitPage, "Smoothness", 1, 20, 5, function(v) Config.Legit.Smoothness = v end)
     AddSlider(LegitPage, "Field of View", 5, 50, 15, function(v) Config.Legit.FOV = v end)
 
-    -- 3. Наполнение Visuals (ESP)
+    -- Visuals (ESP)
     AddToggle(VisualsPage, "Player ESP", true, function(v) Config.Visuals.ESP = v end)
     AddToggle(VisualsPage, "Box Outline", true, function(v) Config.Visuals.BoxOutline = v end)
     AddSlider(VisualsPage, "Max Distance", 50, 500, 250, function(v) Config.Visuals.MaxDist = v end)
 
-    -- 4. Наполнение Misc (Изменение скорости и прыжка персонажа)
-    AddSlider(MiscPage, "WalkSpeed", 16, 100, 16, function(v) 
-        Config.Misc.Speed = v 
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            LocalPlayer.Character.Humanoid.WalkSpeed = v
-        end
-    end)
-    AddSlider(MiscPage, "JumpPower", 50, 200, 50, function(v) 
-        Config.Misc.JumpPower = v 
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            LocalPlayer.Character.Humanoid.JumpPower = v
-        end
-    end)
+    -- Misc (Bunnyhop, Speed, Jump)
+    AddToggle(MiscPage, "Bunnyhop", false, function(v) Config.Misc.Bunnyhop = v end)
+    AddSlider(MiscPage, "WalkSpeed", 16, 100, 16, function(v) Config.Misc.Speed = v end)
+    AddSlider(MiscPage, "JumpPower", 50, 200, 50, function(v) Config.Misc.JumpPower = v end)
 
-    -- 5. Наполнение Configs
+    -- Configs Buttons
     local function AddButton(parent, title, callback)
         local Btn = Instance.new("TextButton")
         Btn.Parent = parent
@@ -362,57 +413,143 @@ local success, errorMessage = pcall(function()
         Btn.MouseButton1Click:Connect(callback)
     end
 
-    AddButton(ConfigsPage, "Save Config", function()
-        print("[Neverlose] Config saved successfully!")
-    end)
-    AddButton(ConfigsPage, "Load Config", function()
-        print("[Neverlose] Config loaded successfully!")
-    end)
+    AddButton(ConfigsPage, "Save Config", function() print("[Neverlose] Saved!") end)
+    AddButton(ConfigsPage, "Load Config", function() print("[Neverlose] Loaded!") end)
 
     --------------------------------------------------
-    -- ОСНОВНОЙ ЦИКЛ ОБРАБОТКИ (RENDERSTEPPED / LOOPS)
+    -- ПРОРИСОВКА ВХ (ESP) НА 2D ЭКРАНЕ
     --------------------------------------------------
-    
-    local function GetClosestPlayer(fovLimit)
-        local target = nil
-        local shortestDist = fovLimit
+    local EspObjects = {}
 
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-                if humanoid and humanoid.Health > 0 then
-                    local rootPart = player.Character.HumanoidRootPart
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
-                    if onScreen then
-                        local mousePos = UserInputService:GetMouseLocation()
-                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                        if dist < shortestDist then
-                            shortestDist = dist
-                            target = player.Character
+    local function CreateEspBox()
+        local box = Drawing.new("Square")
+        box.Visible = false
+        box.Color = Color3.fromRGB(120, 110, 255)
+        box.Thickness = 1
+        box.Filled = false
+        return box
+    end
+
+    --------------------------------------------------
+    -- ГЛАВНЫЙ ЦИКЛ ОБРАБОТКИ (RENDERSTEPPED)
+    --------------------------------------------------
+    local spinAngle = 0
+
+    RunService.RenderStepped:Connect(function(dt)
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart") then
+            local hum = character.Humanoid
+            local hrp = character.HumanoidRootPart
+
+            -- 1. Логика Misc: Скорость и Прыжок
+            if hum.WalkSpeed ~= Config.Misc.Speed then hum.WalkSpeed = Config.Misc.Speed end
+            if hum.JumpPower ~= Config.Misc.JumpPower then hum.JumpPower = Config.Misc.JumpPower end
+
+            -- 2. Логика Bunnyhop (Авто-прыжок при зажатом пробеле)
+            if Config.Misc.Bunnyhop then
+                if hum.FloorMaterial ~= Enum.Material.Air then
+                    hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
+            end
+
+            -- 3. Логика Anti-Aim (Рейдж)
+            if Config.Rage.AntiAim then
+                local currentAngles = hrp.CFrame - hrp.CFrame.Position
+                local targetYaw = currentAngles
+                
+                -- Обработка Yaw модов
+                if Config.Rage.Yaw == "Static" then
+                    targetYaw = CFrame.Angles(0, math.rad(180), 0)
+                elseif Config.Rage.Yaw == "Jitter" then
+                    local jitterVal = (tick() % 0.2 < 0.1) and 90 or -90
+                    targetYaw = CFrame.Angles(0, math.rad(jitterVal), 0)
+                elseif Config.Rage.Yaw == "Spin" then
+                    spinAngle = (spinAngle + dt * 500) % 360
+                    targetYaw = CFrame.Angles(0, math.rad(spinAngle), 0)
+                end
+
+                -- Обработка Pitch модов
+                local pitchVal = 0
+                if Config.Rage.Pitch == "Down" then pitchVal = math.rad(89)
+                elseif Config.Rage.Pitch == "Up" then pitchVal = math.rad(-89)
+                elseif Config.Rage.Pitch == "Zero" then pitchVal = 0
+                elseif Config.Rage.Pitch == "Custom" then pitchVal = math.rad(45) end
+
+                hrp.CFrame = CFrame.new(hrp.Position) * CFrame.Angles(pitchVal, 0, 0) * targetYaw
+            end
+        end
+
+        -- 4. Проверка и работа Aimbot (Легит / Рейдж)
+        local activeAimbotEnable = Config.Legit.Enable or Config.Rage.Enable
+        local activeFov = Config.Legit.Enable and (Config.Legit.FOV * 10) or (Config.Rage.FOV * 10)
+
+        if activeAimbotEnable then
+            local targetChar = nil
+            local shortestDist = activeFov
+
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                    if hum and hum.Health > 0 then
+                        local rootPart = player.Character.HumanoidRootPart
+                        local screenPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+                        if onScreen then
+                            local mousePos = UserInputService:GetMouseLocation()
+                            local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                            if dist < shortestDist then
+                                shortestDist = dist
+                                targetChar = player.Character
+                            end
                         end
                     end
                 end
             end
-        end
-        return target
-    end
 
-    RunService.RenderStepped:Connect(function()
-        -- Поддержание кастомной скорости/прыжка при респавне
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            local hum = LocalPlayer.Character.Humanoid
-            if hum.WalkSpeed ~= Config.Misc.Speed then hum.WalkSpeed = Config.Misc.Speed end
-        end
-
-        -- Автономная логика Legit Bot (плавное наведение без отдачи)
-        if Config.Legit.Enable then
-            local targetChar = GetClosestPlayer(Config.Legit.FOV * 10)
             if targetChar and targetChar:FindFirstChild("Head") then
                 local headPos = targetChar.Head.Position
                 local currentCFrame = Camera.CFrame
                 local targetCFrame = CFrame.new(currentCFrame.Position, headPos)
-                -- Плавная интерполяция по Smoothness
-                Camera.CFrame = currentCFrame:Lerp(targetCFrame, 1 / math.max(Config.Legit.Smoothness, 1))
+                
+                if Config.Rage.Enable then
+                    -- Мгновенная наводка для Rage
+                    Camera.CFrame = targetCFrame
+                else
+                    -- Плавная наводка для Legit
+                    Camera.CFrame = currentCFrame:Lerp(targetCFrame, 1 / math.max(Config.Legit.Smoothness, 1))
+                end
+            end
+        end
+
+        -- 5. Проверка и работа ВХ (ESP)
+        if Drawing then
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    if not EspObjects[player] then
+                        EspObjects[player] = CreateEspBox()
+                    end
+                    
+                    local box = EspObjects[player]
+                    local char = player.Character
+                    if Config.Visuals.ESP and char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") and char.Humanoid.Health > 0 then
+                        local hrp = char.HumanoidRootPart
+                        local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
+                        
+                        if dist <= Config.Visuals.MaxDist then
+                            local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                            if onScreen then
+                                box.Size = Vector2.new(2000 / dist, 3500 / dist)
+                                box.Position = Vector2.new(screenPos.X - box.Size.X / 2, screenPos.Y - box.Size.Y / 2)
+                                box.Visible = true
+                            else
+                                box.Visible = false
+                            end
+                        else
+                            box.Visible = false
+                        end
+                    else
+                        box.Visible = false
+                    end
+                end
             end
         end
     end)
@@ -452,11 +589,16 @@ local success, errorMessage = pcall(function()
     end)
 
     DevTab.MouseButton1Click:Connect(function()
+        if Drawing then
+            for _, box in pairs(EspObjects) do
+                pcall(function() box:Remove() end)
+            end
+        end
         ScreenGui:Destroy()
         WatermarkGui:Destroy()
     end)
 
-    -- Перетаскивание
+    -- Перетаскивание интерфейса
     local draggingMain, dragStartMain, startPosMain
     TopBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then

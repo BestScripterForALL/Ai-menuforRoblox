@@ -1,0 +1,515 @@
+--------------------------------------------------------------------------------
+-- 1. ИНИЦИАЛИЗАЦИЯ ИНТЕРФЕЙСА (RAYFIELD)
+--------------------------------------------------------------------------------
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Mobile Combat Suite & DevSpy Hub",
+   LoadingTitle = "Загрузка модулей...",
+   LoadingSubtitle = "by Assistant",
+   ConfigurationSaving = {
+      Enabled = false
+   },
+   KeySystem = false
+})
+
+--------------------------------------------------------------------------------
+-- 2. СЕРВИСЫ И КОНФИГУРАЦИЯ
+--------------------------------------------------------------------------------
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+_G.WallbangEnabled = false
+_G.BigHitboxes = false
+
+local Config = {
+    Aimbot = {
+        Enabled = false,
+        TargetPart = "Head", -- "Head", "Body", "Root"
+        FOV = 350,
+        Smoothness = 1,
+        TriggerbotEnabled = false,
+        DrawFOV = true,
+        WallCheck = true -- Проверка стен для аимбота
+    },
+    ESP = {
+        Enabled = false,
+        HighlightHitboxes = true,
+        BoxColor = Color3.fromRGB(255, 0, 0),
+        HeadColor = Color3.fromRGB(0, 255, 0),
+        BodyColor = Color3.fromRGB(0, 150, 255)
+    }
+}
+
+_G.RapidFireConfig = {
+    Enabled = true,
+    Multiplier = 0.3
+}
+
+-- Создание круга FOV (Drawing API)
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = Config.Aimbot.DrawFOV
+FOVCircle.Transparency = 0.7
+FOVCircle.Color = Color3.fromRGB(255, 0, 0)
+FOVCircle.Thickness = 1
+FOVCircle.Filled = false
+
+--------------------------------------------------------------------------------
+-- 3. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ПОИСКА И ПРОВЕРОК
+--------------------------------------------------------------------------------
+local function GetCharacterParts(model)
+    if not model or not model:IsA("Model") then return nil end
+    if not model:FindFirstChildOfClass("Humanoid") then return nil end
+
+    return {
+        HeadHitbox = model:FindFirstChild("HeadHitbox"),
+        BodyHitbox = model:FindFirstChild("BodyHitbox"),
+        Root = model:FindFirstChild("HumanoidRootPart"),
+        Head = model:FindFirstChild("Head")
+    }
+end
+
+local function GetTargetPart(model, preferredType)
+    local parts = GetCharacterParts(model)
+    if not parts then return nil end
+
+    if preferredType == "Head" then
+        return parts.HeadHitbox or parts.Head or parts.Root
+    elseif preferredType == "Body" then
+        return parts.BodyHitbox or parts.Root
+    else
+        return parts.Root or parts.BodyHitbox or parts.HeadHitbox
+    end
+end
+
+-- Функция проверки видимости (WallCheck через Raycast)
+local function IsVisible(targetPart)
+    if not Config.Aimbot.WallCheck or _G.WallbangEnabled then return true end
+    
+    local character = LocalPlayer.Character
+    local origin = Camera.CFrame.Position
+    local direction = (targetPart.Position - origin)
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    
+    -- Игнорируем себя и модели игроков/клиентский вьюмодел
+    local ignoreList = {character, workspace:FindFirstChild("ClientViewmodel")}
+    for _, obj in ipairs(Workspace:GetChildren()) do
+        if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
+            table.insert(ignoreList, obj)
+        end
+    end
+    raycastParams.FilterDescendantsInstances = ignoreList
+
+    local result = Workspace:Raycast(origin, direction, raycastParams)
+    if result then
+        -- Если луч задел что-то до цели, значит цель за стеной
+        local hitInstance = result.Instance
+        if hitInstance:IsDescendantOf(targetPart.Parent) then
+            return true
+        end
+        return false
+    end
+    
+    return true
+end
+
+--------------------------------------------------------------------------------
+-- 4. ЛОГИКА AIMBOT (Поиск ближайшего по дистанции в студах в пределах FOV)
+--------------------------------------------------------------------------------
+local function GetClosestTarget()
+    local closestPart = nil
+    local shortestDistance3D = math.huge -- Поиск абсолютного лидера по дистанции в студах (внутри FOV)
+    local viewportCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    for _, obj in ipairs(Workspace:GetChildren()) do
+        if obj:IsA("Model") and obj ~= LocalPlayer.Character and obj.Name ~= "ClientViewmodel" then
+            local humanoid = obj:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                local targetPart = GetTargetPart(obj, Config.Aimbot.TargetPart)
+                
+                if targetPart then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                    if onScreen then
+                        local mouseDistance = (Vector2.new(screenPos.X, screenPos.Y) - viewportCenter).Magnitude
+                        
+                        -- Проверяем, что цель находится в пределах FOV и видна (если включен WallCheck)
+                        if mouseDistance <= Config.Aimbot.FOV and IsVisible(targetPart) then
+                            local distance3D = (targetPart.Position - Camera.CFrame.Position).Magnitude
+                            
+                            -- Выбираем строго самую близкую цель в студах с динамическим переключением
+                            if distance3D < shortestDistance3D then
+                                shortestDistance3D = distance3D
+                                closestPart = targetPart
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return closestPart
+end
+
+local ESPCache = {}
+
+local function ClearESP(model)
+    if ESPCache[model] then
+        for _, object in pairs(ESPCache[model]) do
+            object:Destroy()
+        end
+        ESPCache[model] = nil
+    end
+end
+
+local function CreateAdornment(part, color)
+    local box = Instance.new("BoxHandleAdornment")
+    box.Size = part.Size
+    box.Color3 = color
+    box.Transparency = 0.5
+    box.AlwaysOnTop = true
+    box.ZIndex = 10
+    box.Adornee = part
+    box.Parent = part
+    return box
+end
+
+local function UpdateESP()
+    if not Config.ESP.Enabled then
+        for model in pairs(ESPCache) do
+            ClearESP(model)
+        end
+        return
+    end
+
+    for _, obj in ipairs(Workspace:GetChildren()) do
+        if obj:IsA("Model") and obj ~= LocalPlayer.Character and obj.Name ~= "ClientViewmodel" then
+            local parts = GetCharacterParts(obj)
+
+            if parts and (parts.Root or parts.HeadHitbox) then
+                if not ESPCache[obj] then
+                    ESPCache[obj] = {}
+
+                    local highlight = Instance.new("Highlight")
+                    highlight.Adornee = obj
+                    highlight.FillColor = Config.ESP.BoxColor
+                    highlight.FillTransparency = 0.6
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    highlight.Parent = obj
+                    table.insert(ESPCache[obj], highlight)
+
+                    if Config.ESP.HighlightHitboxes then
+                        if parts.HeadHitbox then
+                            table.insert(ESPCache[obj], CreateAdornment(parts.HeadHitbox, Config.ESP.HeadColor))
+                        end
+                        if parts.BodyHitbox then
+                            table.insert(ESPCache[obj], CreateAdornment(parts.BodyHitbox, Config.ESP.BodyColor))
+                        end
+                    end
+                end
+            else
+                ClearESP(obj)
+            end
+        end
+    end
+end
+
+local function TriggerShoot()
+    pcall(function()
+        local character = LocalPlayer.Character
+        if character then
+            local tool = character:FindFirstChildOfClass("Tool")
+            if tool then
+                if typeof(tool.Activate) == "function" then
+                    tool:Activate()
+                end
+                local fireEvent = tool:FindFirstChild("Fire") or tool:FindFirstChild("Shoot")
+                if fireEvent and fireEvent:IsA("RemoteEvent") then
+                    fireEvent:FireServer()
+                end
+            end
+        end
+    end)
+end
+
+--------------------------------------------------------------------------------
+-- 5. ВКЛАДКИ И ЭЛЕМЕНТЫ УПРАВЛЕНИЯ
+--------------------------------------------------------------------------------
+
+local PlayerTab = Window:CreateTab("Игрок 🏃", 4483362458)
+
+PlayerTab:CreateSlider({
+   Name = "Скорость бега (Speed)",
+   Range = {16, 150},
+   Increment = 1,
+   Suffix = " Studs",
+   CurrentValue = 16,
+   Flag = "WalkSpeedFlag",
+   Callback = function(Value)
+      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+         LocalPlayer.Character.Humanoid.WalkSpeed = Value
+      end
+   end,
+})
+
+local CombatTab = Window:CreateTab("Оружие & Aimbot 🔫", 4483362458)
+
+CombatTab:CreateToggle({
+   Name = "Включить Rage Aimbot",
+   CurrentValue = Config.Aimbot.Enabled,
+   Flag = "AimbotToggle",
+   Callback = function(Value)
+      Config.Aimbot.Enabled = Value
+   end,
+})
+
+CombatTab:CreateToggle({
+   Name = "Включить Triggerbot (Автовыстрел)",
+   CurrentValue = Config.Aimbot.TriggerbotEnabled,
+   Flag = "TriggerbotToggle",
+   Callback = function(Value)
+      Config.Aimbot.TriggerbotEnabled = Value
+   end,
+})
+
+CombatTab:CreateToggle({
+   Name = "Проверка стен (WallCheck)",
+   CurrentValue = Config.Aimbot.WallCheck,
+   Flag = "WallCheckToggle",
+   Callback = function(Value)
+      Config.Aimbot.WallCheck = Value
+   end,
+})
+
+CombatTab:CreateToggle({
+   Name = "Отображать FOV круг",
+   CurrentValue = Config.Aimbot.DrawFOV,
+   Flag = "DrawFOVToggle",
+   Callback = function(Value)
+      Config.Aimbot.DrawFOV = Value
+      FOVCircle.Visible = Value
+   end,
+})
+
+CombatTab:CreateDropdown({
+   Name = "Приоритет Цели Aimbot",
+   Options = {"Head", "Body", "Root"},
+   CurrentOption = {"Head"},
+   MultipleOptions = false,
+   Flag = "TargetPartDropdown",
+   Callback = function(Option)
+      Config.Aimbot.TargetPart = Option[1]
+   end,
+})
+
+CombatTab:CreateSlider({
+   Name = "Aimbot FOV (Радиус захвата)",
+   Range = {50, 800},
+   Increment = 10,
+   Suffix = "px",
+   CurrentValue = Config.Aimbot.FOV,
+   Flag = "AimbotFOVSlider",
+   Callback = function(Value)
+      Config.Aimbot.FOV = Value
+   end,
+})
+
+CombatTab:CreateSlider({
+   Name = "Множитель скорострельности",
+   Range = {1, 10},
+   Increment = 1,
+   Suffix = "x",
+   CurrentValue = 1,
+   Flag = "FireRateFlag",
+   Callback = function(Value)
+      _G.RapidFireConfig.Multiplier = 1 / Value
+      local Character = LocalPlayer.Character
+      if Character then
+         for _, tool in pairs(Character:GetChildren()) do
+            if tool:IsA("Tool") then
+               if tool:FindFirstChild("FireRate") then
+                  tool.FireRate.Value = tool.FireRate.Value / Value
+               elseif tool:SetAttribute("FireRate", nil) then
+                  tool:SetAttribute("FireRate", 0.1 / Value)
+               end
+            end
+         end
+      end
+   end,
+})
+
+CombatTab:CreateToggle({
+   Name = "Урон через стены (Wallbang)",
+   CurrentValue = false,
+   Flag = "WallbangFlag",
+   Callback = function(Value)
+      _G.WallbangEnabled = Value
+      if Value then
+         Rayfield:Notify({
+            Title = "Wallbang Активирован",
+            Content = "Пули теперь игнорируют карты/стены.",
+            Duration = 3,
+            Image = 4483362458,
+         })
+      end
+   end,
+})
+
+CombatTab:CreateToggle({
+   Name = "Увеличенные хитбоксы (Magic Bullets)",
+   CurrentValue = false,
+   Flag = "HitboxExpandFlag",
+   Callback = function(Value)
+      _G.BigHitboxes = Value
+      
+      task.spawn(function()
+         while _G.BigHitboxes do
+            task.wait(0.5)
+            for _, player in pairs(Players:GetPlayers()) do
+               if player ~= LocalPlayer and player.Character then
+                  local head = player.Character:FindFirstChild("HeadHitbox") or player.Character:FindFirstChild("Head")
+                  if head then
+                     head.Size = Value and Vector3.new(5, 5, 5) or Vector3.new(1.15, 1.15, 1.15)
+                     head.Transparency = Value and 0.6 or 1
+                     head.CanCollide = false
+                  end
+               end
+            end
+         end
+      end)
+   end,
+})
+
+local VisualsTab = Window:CreateTab("Визуалы (ESP) 👁️", 4483362458)
+
+VisualsTab:CreateToggle({
+   Name = "Включить ESP (Wallhack)",
+   CurrentValue = Config.ESP.Enabled,
+   Flag = "ESPToggle",
+   Callback = function(Value)
+      Config.ESP.Enabled = Value
+   end,
+})
+
+VisualsTab:CreateToggle({
+   Name = "Подсветка HeadHitbox / BodyHitbox",
+   CurrentValue = Config.ESP.HighlightHitboxes,
+   Flag = "HitboxESPToggle",
+   Callback = function(Value)
+      Config.ESP.HighlightHitboxes = Value
+      for model in pairs(ESPCache) do
+          ClearESP(model)
+      end
+   end,
+})
+
+local ToolsTab = Window:CreateTab("Инструменты 🛠️", 4483362458)
+
+ToolsTab:CreateButton({
+   Name = "Запустить DevSpy",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/BestScripterForALL/Ai-menuforRoblox/main/DevSpy"))()
+      Rayfield:Notify({
+         Title = "DevSpy",
+         Content = "Скрипт DevSpy запущен!",
+         Duration = 3,
+         Image = 4483362458,
+      })
+   end,
+})
+
+--------------------------------------------------------------------------------
+-- 6. ХУКИ И ОСНОВНОЙ ЦИКЛ ОБРАБОТКИ
+--------------------------------------------------------------------------------
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+   local method = getnamecallmethod()
+   local args = {...}
+
+   if _G.WallbangEnabled and (method == "Raycast" or method == "FindPartOnRayWithIgnoreList") then
+      if typeof(args[3]) == "table" then
+         table.insert(args[3], Workspace:FindFirstChild("Map"))
+         table.insert(args[3], Workspace.Terrain)
+      end
+   end
+
+   return oldNamecall(self, unpack(args))
+end)
+
+local oldIndex
+oldIndex = hookmetamethod(game, "__index", function(self, k)
+    if not checkcaller() and _G.RapidFireConfig.Enabled then
+        if k == "Cooldown" or k == "FireRate" or k == "LastShot" then
+            local weaponModule = rawget(self, "FireRate") or rawget(self, "Cooldown")
+            if weaponModule then
+                return weaponModule * _G.RapidFireConfig.Multiplier
+            end
+        end
+    end
+    return oldIndex(self, k)
+end)
+
+RunService.RenderStepped:Connect(function()
+    UpdateESP()
+
+    FOVCircle.Visible = Config.Aimbot.DrawFOV
+    FOVCircle.Radius = Config.Aimbot.FOV
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    if Config.Aimbot.Enabled then
+        local targetPart = GetClosestTarget()
+        if targetPart and LocalPlayer.Character then
+            local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local aimAlign = rootPart and rootPart:FindFirstChild("AimAlign")
+            
+            if aimAlign and aimAlign:IsA("AlignOrientation") then
+                local currentCFrame = rootPart.CFrame
+                local targetCFrame = CFrame.lookAt(rootPart.Position, Vector3.new(targetPart.Position.X, targetPart.Position.Y, targetPart.Position.Z))
+                aimAlign.CFrame = currentCFrame:Lerp(targetCFrame, 1)
+            else
+                local currentCFrame = Camera.CFrame
+                local targetCFrame = CFrame.lookAt(currentCFrame.Position, targetPart.Position)
+                Camera.CFrame = currentCFrame:Lerp(targetCFrame, 1)
+            end
+
+            if Config.Aimbot.TriggerbotEnabled then
+                local viewportCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                if onScreen then
+                    local screenCoord = Vector2.new(screenPos.X, screenPos.Y)
+                    if (screenCoord - viewportCenter).Magnitude < 25 then
+                        TriggerShoot()
+                    end
+                end
+            end
+        end
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    if _G.RapidFireConfig.Enabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+        local character = LocalPlayer.Character
+        if character then
+            local tool = character:FindFirstChildOfClass("Tool")
+            if tool then
+                local fireEvent = tool:FindFirstChild("Fire") or tool:FindFirstChild("Shoot")
+                if fireEvent and fireEvent:IsA("RemoteEvent") then
+                    pcall(function()
+                        fireEvent:FireServer()
+                    end)
+                end
+            end
+        end
+    end
+end)
+
+Workspace.ChildRemoved:Connect(function(child)
+    ClearESP(child)
+end)

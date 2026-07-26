@@ -772,7 +772,7 @@ createActionCard("Тотальный сканер (100% всё кроме све
                         
                         table.insert(txtLines, line)
                         
-                        if #txtLines > 900 then
+                        if #txtLines > 9000 then
                             table.insert(txtLines, "... [ПРЕРВАНО: Достигнут лимит строк отчета] ...")
                             return
                         end

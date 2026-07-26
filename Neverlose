@@ -1,8 +1,9 @@
--- Защищенный загрузчик Neverlose Mobile UI Library (Advanced Features)
+-- Защищенный загрузчик Neverlose Mobile UI Library (Fixed ESP & Teammate Check & Attack Event)
 local success, errorMessage = pcall(function()
     local Players = game:GetService("Players")
     local UserInputService = game:GetService("UserInputService")
     local RunService = game:GetService("RunService")
+    local VirtualInputManager = game:GetService("VirtualInputManager")
     local LocalPlayer = Players.LocalPlayer
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
     local Camera = workspace.CurrentCamera
@@ -14,6 +15,9 @@ local success, errorMessage = pcall(function()
     if PlayerGui:FindFirstChild("NeverloseWatermark") then
         PlayerGui.NeverloseWatermark:Destroy()
     end
+    if PlayerGui:FindFirstChild("NeverloseAttackButton") then
+        PlayerGui.NeverloseAttackButton:Destroy()
+    end
 
     -- Таблица конфигурации читов
     local Config = {
@@ -22,8 +26,8 @@ local success, errorMessage = pcall(function()
             AutoShoot = false, 
             FOV = 45,
             AntiAim = false,
-            Pitch = "Zero", -- Down, Up, Zero, Custom
-            Yaw = "Static"  -- Static, Jitter, Spin
+            Pitch = "Zero",
+            Yaw = "Static"
         },
         Legit = { Enable = false, Smoothness = 5, FOV = 15 },
         Visuals = { ESP = true, BoxOutline = true, MaxDist = 250 },
@@ -187,7 +191,7 @@ local success, errorMessage = pcall(function()
     local ConfigsPage = createTab("Configs", 5)
     local DevTab = createTab("Dev", 6)
 
-    -- UI Компоненты (Чекбокс, Слайдер, Дропдаун/Селектор)
+    -- UI Компоненты
     local function AddToggle(parent, title, defaultState, callback)
         local state = defaultState
         local ToggleBtn = Instance.new("TextButton")
@@ -369,10 +373,8 @@ local success, errorMessage = pcall(function()
     end
 
     --------------------------------------------------
-    -- ЗАПОЛНЕНИЕ ВКЛАДОК И ЛОГИКА
+    -- ЗАПОЛНЕНИЕ ВКЛАДОК
     --------------------------------------------------
-
-    -- Ragebot & Anti-Aim
     AddToggle(RagePage, "Enable Ragebot", false, function(v) Config.Rage.Enable = v end)
     AddToggle(RagePage, "Auto Shoot", false, function(v) Config.Rage.AutoShoot = v end)
     AddSlider(RagePage, "Field of View", 1, 180, 45, function(v) Config.Rage.FOV = v end)
@@ -381,22 +383,18 @@ local success, errorMessage = pcall(function()
     AddDropdown(RagePage, "AA Pitch", {"Down", "Up", "Zero", "Custom"}, "Zero", function(v) Config.Rage.Pitch = v end)
     AddDropdown(RagePage, "AA Yaw", {"Static", "Jitter", "Spin"}, "Static", function(v) Config.Rage.Yaw = v end)
 
-    -- Legitbot
     AddToggle(LegitPage, "Enable Legitbot", false, function(v) Config.Legit.Enable = v end)
     AddSlider(LegitPage, "Smoothness", 1, 20, 5, function(v) Config.Legit.Smoothness = v end)
-    AddSlider(LegitPage, "Field of View", 5, 50, 15, function(v) Config.Legit.FOV = v end)
+    AddSlider(LegitPage, "Field of View", 5, 500, 15, function(v) Config.Legit.FOV = v end)
 
-    -- Visuals (ESP)
     AddToggle(VisualsPage, "Player ESP", true, function(v) Config.Visuals.ESP = v end)
     AddToggle(VisualsPage, "Box Outline", true, function(v) Config.Visuals.BoxOutline = v end)
     AddSlider(VisualsPage, "Max Distance", 50, 500, 250, function(v) Config.Visuals.MaxDist = v end)
 
-    -- Misc (Bunnyhop, Speed, Jump)
     AddToggle(MiscPage, "Bunnyhop", false, function(v) Config.Misc.Bunnyhop = v end)
     AddSlider(MiscPage, "WalkSpeed", 16, 100, 16, function(v) Config.Misc.Speed = v end)
     AddSlider(MiscPage, "JumpPower", 50, 200, 50, function(v) Config.Misc.JumpPower = v end)
 
-    -- Configs Buttons
     local function AddButton(parent, title, callback)
         local Btn = Instance.new("TextButton")
         Btn.Parent = parent
@@ -417,18 +415,124 @@ local success, errorMessage = pcall(function()
     AddButton(ConfigsPage, "Load Config", function() print("[Neverlose] Loaded!") end)
 
     --------------------------------------------------
-    -- ПРОРИСОВКА ВХ (ESP) НА 2D ЭКРАНЕ
+    -- ПРОВЕРКА НА ТИМЕЙТА (Безопасная функция)
     --------------------------------------------------
-    local EspObjects = {}
-
-    local function CreateEspBox()
-        local box = Drawing.new("Square")
-        box.Visible = false
-        box.Color = Color3.fromRGB(120, 110, 255)
-        box.Thickness = 1
-        box.Filled = false
-        return box
+    local function IsTeammate(player)
+        if player == LocalPlayer then return true end
+        -- Проверка по стандартной командной системе Roblox
+        if player.Team and LocalPlayer.Team and player.Team == LocalPlayer.Team then
+            return true
+        end
+        -- Дополнительная проверка на атрибуты/теги если заданы в игре
+        if player:GetAttribute("Team") and LocalPlayer:GetAttribute("Team") then
+            if player:GetAttribute("Team") == LocalPlayer:GetAttribute("Team") then
+                return true
+            end
+        end
+        return false
     end
+
+    --------------------------------------------------
+    -- ИСПРАВЛЕННЫЙ И СТАБИЛЬНЫЙ ВХ (ESP)
+    --------------------------------------------------
+    local EspFrames = {}
+
+    local function UpdateESP()
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local guiName = "NeverloseESP_" .. player.Name
+                local boxGui = PlayerGui:FindFirstChild(guiName)
+
+                local char = player.Character
+                local shouldShow = Config.Visuals.ESP and char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") and char.Humanoid.Health > 0 and not IsTeammate(player)
+
+                if shouldShow then
+                    local hrp = char.HumanoidRootPart
+                    local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
+
+                    if dist <= Config.Visuals.MaxDist then
+                        local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                        if onScreen then
+                            if not boxGui then
+                                boxGui = Instance.new("ScreenGui")
+                                boxGui.Name = guiName
+                                boxGui.Parent = PlayerGui
+                                boxGui.IgnoreGuiInset = true
+                                boxGui.ResetOnSpawn = false
+
+                                local frame = Instance.new("Frame")
+                                frame.Name = "Box"
+                                frame.Parent = boxGui
+                                frame.BackgroundTransparency = 1
+                                frame.BorderSizePixel = 1
+                                frame.BorderColor3 = Color3.fromRGB(120, 110, 255)
+                            end
+
+                            local frame = boxGui:FindFirstChild("Box")
+                            if frame then
+                                local sizeFactor = math.clamp(2500 / dist, 10, 500)
+                                frame.Size = UDim2.new(0, sizeFactor * 0.6, 0, sizeFactor)
+                                frame.Position = UDim2.new(0, screenPos.X - (sizeFactor * 0.3), 0, screenPos.Y - (sizeFactor * 0.5))
+                                boxGui.Enabled = true
+                            end
+                        else
+                            if boxGui then boxGui.Enabled = false end
+                        end
+                    else
+                        if boxGui then boxGui.Enabled = false end
+                    end
+                else
+                    if boxGui then boxGui.Enabled = false end
+                end
+            end
+        end
+    end
+
+    --------------------------------------------------
+    -- КНОПКА СТРЕЛЬБЫ СПРАВА (Специальный элемент управления)
+    --------------------------------------------------
+    local AttackGui = Instance.new("ScreenGui")
+    AttackGui.Name = "NeverloseAttackButton"
+    AttackGui.Parent = PlayerGui
+    AttackGui.IgnoreGuiInset = true
+    AttackGui.ResetOnSpawn = false
+
+    local AttackBtn = Instance.new("TextButton")
+    AttackBtn.Name = "FireButton"
+    AttackBtn.Parent = AttackGui
+    AttackBtn.BackgroundColor3 = Color3.fromRGB(120, 110, 255)
+    AttackBtn.BackgroundTransparency = 0.3
+    AttackBtn.Position = UDim2.new(1, -90, 0.5, -30)
+    AttackBtn.Size = UDim2.new(0, 60, 0, 60)
+    AttackBtn.Font = Enum.Font.GothamBold
+    AttackBtn.Text = "FIRE"
+    AttackBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    AttackBtn.TextSize = 12
+
+    local AttackCorner = Instance.new("UICorner")
+    AttackCorner.CornerRadius = UDim.new(1, 0)
+    AttackCorner.Parent = AttackBtn
+
+    -- Функция вызова события стрельбы
+    local isShooting = false
+    local function TriggerShoot()
+        if isShooting then return end
+        isShooting = true
+        task.spawn(function()
+            pcall(function()
+                -- Эмуляция нажатия ЛКМ / выстрела для мобильных экзекуторов
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                task.wait(0.05)
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+            end)
+            task.wait(0.1)
+            isShooting = false
+        end)
+    end
+
+    AttackBtn.MouseButton1Down:Connect(function()
+        TriggerShoot()
+    end)
 
     --------------------------------------------------
     -- ГЛАВНЫЙ ЦИКЛ ОБРАБОТКИ (RENDERSTEPPED)
@@ -441,23 +545,20 @@ local success, errorMessage = pcall(function()
             local hum = character.Humanoid
             local hrp = character.HumanoidRootPart
 
-            -- 1. Логика Misc: Скорость и Прыжок
+            -- Misc: Скорость и Прыжок
             if hum.WalkSpeed ~= Config.Misc.Speed then hum.WalkSpeed = Config.Misc.Speed end
             if hum.JumpPower ~= Config.Misc.JumpPower then hum.JumpPower = Config.Misc.JumpPower end
 
-            -- 2. Логика Bunnyhop (Авто-прыжок при зажатом пробеле)
+            -- Bunnyhop
             if Config.Misc.Bunnyhop then
                 if hum.FloorMaterial ~= Enum.Material.Air then
                     hum:ChangeState(Enum.HumanoidStateType.Jumping)
                 end
             end
 
-            -- 3. Логика Anti-Aim (Рейдж)
+            -- Anti-Aim
             if Config.Rage.AntiAim then
-                local currentAngles = hrp.CFrame - hrp.CFrame.Position
-                local targetYaw = currentAngles
-                
-                -- Обработка Yaw модов
+                local targetYaw = hrp.CFrame - hrp.CFrame.Position
                 if Config.Rage.Yaw == "Static" then
                     targetYaw = CFrame.Angles(0, math.rad(180), 0)
                 elseif Config.Rage.Yaw == "Jitter" then
@@ -468,7 +569,6 @@ local success, errorMessage = pcall(function()
                     targetYaw = CFrame.Angles(0, math.rad(spinAngle), 0)
                 end
 
-                -- Обработка Pitch модов
                 local pitchVal = 0
                 if Config.Rage.Pitch == "Down" then pitchVal = math.rad(89)
                 elseif Config.Rage.Pitch == "Up" then pitchVal = math.rad(-89)
@@ -479,7 +579,7 @@ local success, errorMessage = pcall(function()
             end
         end
 
-        -- 4. Проверка и работа Aimbot (Легит / Рейдж)
+        -- Aimbot & Авто-выстрел (с учетом проверки на тимейтов)
         local activeAimbotEnable = Config.Legit.Enable or Config.Rage.Enable
         local activeFov = Config.Legit.Enable and (Config.Legit.FOV * 10) or (Config.Rage.FOV * 10)
 
@@ -488,7 +588,7 @@ local success, errorMessage = pcall(function()
             local shortestDist = activeFov
 
             for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                if player ~= LocalPlayer and not IsTeammate(player) and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                     local hum = player.Character:FindFirstChildOfClass("Humanoid")
                     if hum and hum.Health > 0 then
                         local rootPart = player.Character.HumanoidRootPart
@@ -511,50 +611,23 @@ local success, errorMessage = pcall(function()
                 local targetCFrame = CFrame.new(currentCFrame.Position, headPos)
                 
                 if Config.Rage.Enable then
-                    -- Мгновенная наводка для Rage
                     Camera.CFrame = targetCFrame
                 else
-                    -- Плавная наводка для Legit
                     Camera.CFrame = currentCFrame:Lerp(targetCFrame, 1 / math.max(Config.Legit.Smoothness, 1))
                 end
-            end
-        end
 
-        -- 5. Проверка и работа ВХ (ESP)
-        if Drawing then
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer then
-                    if not EspObjects[player] then
-                        EspObjects[player] = CreateEspBox()
-                    end
-                    
-                    local box = EspObjects[player]
-                    local char = player.Character
-                    if Config.Visuals.ESP and char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") and char.Humanoid.Health > 0 then
-                        local hrp = char.HumanoidRootPart
-                        local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
-                        
-                        if dist <= Config.Visuals.MaxDist then
-                            local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                            if onScreen then
-                                box.Size = Vector2.new(2000 / dist, 3500 / dist)
-                                box.Position = Vector2.new(screenPos.X - box.Size.X / 2, screenPos.Y - box.Size.Y / 2)
-                                box.Visible = true
-                            else
-                                box.Visible = false
-                            end
-                        else
-                            box.Visible = false
-                        end
-                    else
-                        box.Visible = false
-                    end
+                -- Логика автострельбы при наводке на цель
+                if Config.Rage.Enable and Config.Rage.AutoShoot then
+                    TriggerShoot()
                 end
             end
         end
+
+        -- Обновление стабильного ВХ
+        UpdateESP()
     end)
 
-    -- Плавающая кнопка-значок "N"
+    -- Плавающая кнопка-значок "N" для сворачивания меню
     local WatermarkGui = Instance.new("ScreenGui")
     WatermarkGui.Name = "NeverloseWatermark"
     WatermarkGui.Parent = PlayerGui
@@ -589,13 +662,13 @@ local success, errorMessage = pcall(function()
     end)
 
     DevTab.MouseButton1Click:Connect(function()
-        if Drawing then
-            for _, box in pairs(EspObjects) do
-                pcall(function() box:Remove() end)
-            end
+        for _, p in ipairs(Players:GetPlayers()) do
+            local gui = PlayerGui:FindFirstChild("NeverloseESP_" .. p.Name)
+            if gui then gui:Destroy() end
         end
         ScreenGui:Destroy()
         WatermarkGui:Destroy()
+        AttackGui:Destroy()
     end)
 
     -- Перетаскивание интерфейса

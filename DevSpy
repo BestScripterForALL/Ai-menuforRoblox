@@ -1,4 +1,7 @@
--- // Проверка на повторный запуск
+-- ==========================================================
+-- LITESPY // MULTI-METHOD + CAMERA DEBUG SPY
+-- ==========================================================
+
 if game:GetService("CoreGui"):FindFirstChild("LiteSpy_MultiMethod") then
     game:GetService("CoreGui").LiteSpy_MultiMethod:Destroy()
 end
@@ -7,13 +10,20 @@ end
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
 
 -- // Состояние
 local capturedLogs = {}
 local isRecording = false
 local currentMethod = "Workspace" -- По умолчанию
+
+-- Параметры для Camera Debug
+local LastCameraCFrame = Camera.CFrame
+local PositionThreshold = 0.5
+local RotationThreshold = 0.05
 
 -- // Создание GUI
 local ScreenGui = Instance.new("ScreenGui")
@@ -104,7 +114,7 @@ Content.Position = UDim2.new(0, 10, 0, 45)
 Content.BackgroundTransparency = 1
 Content.Parent = MainFrame
 
--- Выбор метода (Табы / Кнопки переключения)
+-- Выбор метода
 local MethodLabel = Instance.new("TextLabel")
 MethodLabel.Size = UDim2.new(1, 0, 0, 20)
 MethodLabel.BackgroundTransparency = 1
@@ -174,29 +184,29 @@ local DescLabel = Instance.new("TextLabel")
 DescLabel.Size = UDim2.new(1, 0, 0, 100)
 DescLabel.Position = UDim2.new(0, 0, 0, 225)
 DescLabel.BackgroundTransparency = 1
-DescLabel.Text = "Нажмите на кнопку метода, чтобы переключить тактику чтения под клиентскую игру."
+DescLabel.Text = "Добавлен метод Camera Debug для фиксации сетевых/локальных пакетов обзора при повороте и движении камеры."
 DescLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
 DescLabel.TextSize = 11
 DescLabel.TextWrapped = true
 DescLabel.Font = Enum.Font.SourceSansItalic
 DescLabel.Parent = Content
 
--- // Логика переключения методов
-local methods = {"Workspace", "GC_Scan", "Attributes"}
+-- // Логика переключения методов (включая CameraDebug)
+local currentMethodIndex = 1
+local methodsList = {"Workspace", "GC_Scan", "Attributes", "CameraDebug"}
 local methodNames = {
-    ["Workspace"] = "Метод: Workspace Spy (Спавн объектов)",
-    ["GC_Scan"] = "Метод: GC Inspector (Память / Таблицы)",
-    ["Attributes"] = "Метод: Attribute Hook (Свойства)"
+    ["Workspace"]   = "Метод: Workspace Spy (Спавн объектов)",
+    ["GC_Scan"]     = "Метод: GC Inspector (Память / Таблицы)",
+    ["Attributes"]  = "Метод: Attribute Hook (Свойства)",
+    ["CameraDebug"] = "Метод: Camera Debug (Пакеты обзора)"
 }
 
 MethodBtn.MouseButton1Click:Connect(function()
-    if currentMethod == "Workspace" then
-        currentMethod = "GC_Scan"
-    elseif currentMethod == "GC_Scan" then
-        currentMethod = "Attributes"
-    else
-        currentMethod = "Workspace"
+    currentMethodIndex = currentMethodIndex + 1
+    if currentMethodIndex > #methodsList then
+        currentMethodIndex = 1
     end
+    currentMethod = methodsList[currentMethodIndex]
     MethodBtn.Text = methodNames[currentMethod]
 end)
 
@@ -209,9 +219,8 @@ local function LogData(category, info)
     InfoLabel.Text = "Собрано данных: " .. #capturedLogs
 end
 
--- // Реализация выбранных методов сканирования
+-- // Реализация методов сканирования
 task.spawn(function()
-    -- 1. Метод Workspace Spy
     Workspace.DescendantAdded:Connect(function(obj)
         if isRecording and currentMethod == "Workspace" then
             LogData("WORKSPACE", "Создан объект: " .. obj:GetFullName() .. " [" .. obj.ClassName .. "]")
@@ -219,7 +228,25 @@ task.spawn(function()
     end)
 end)
 
--- 2. Периодический сканер памяти (GC) и атрибутов
+-- Периодический сканер памяти, атрибутов и камеры
+RunService.RenderStepped:Connect(function(dt)
+    if not isRecording then return end
+
+    if currentMethod == "CameraDebug" then
+        local currentCFrame = Camera.CFrame
+        local posDelta = (currentCFrame.Position - LastCameraCFrame.Position).Magnitude
+        local rotDelta = 1 - math.clamp(currentCFrame.LookVector:Dot(LastCameraCFrame.LookVector), -1, 1)
+        
+        if posDelta >= PositionThreshold or rotDelta >= RotationThreshold then
+            LogData("CAMERA_SPY", string.format("OUTGOING PACKET -> Pos: (%.2f, %.2f, %.2f) | Look: (%.2f, %.2f, %.2f)", 
+                currentCFrame.Position.X, currentCFrame.Position.Y, currentCFrame.Position.Z,
+                currentCFrame.LookVector.X, currentCFrame.LookVector.Y, currentCFrame.LookVector.Z
+            ))
+            LastCameraCFrame = currentCFrame
+        end
+    end
+end)
+
 task.spawn(function()
     while true do
         task.wait(2)
@@ -228,7 +255,6 @@ task.spawn(function()
                 pcall(function()
                     for _, v in ipairs(getgc(true)) do
                         if type(v) == "table" then
-                            -- Ищем ключевые клиентские параметры
                             if rawget(v, "Damage") or rawget(v, "Speed") or rawget(v, "Health") then
                                 LogData("GC_SCAN", string.format("Найдена таблица параметров: Damage=%s, Speed=%s", tostring(v.Damage), tostring(v.Speed)))
                             end
@@ -273,7 +299,7 @@ RecordBtn.MouseButton1Click:Connect(function()
 end)
 
 ExportBtn.MouseButton1Click:Connect(function()
-    local filename = "Spy_" .. tostring(game.PlaceId) .. ".txt"
+    local filename = "LiteSpy_" .. tostring(game.PlaceId) .. ".txt"
     local content = table.concat(capturedLogs, "\n")
     
     local writeOK = false

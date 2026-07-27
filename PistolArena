@@ -1,1 +1,445 @@
+-- ==========================================================
+-- TORNADO SCRIPTS.WIN
+-- ==========================================================
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Tornado scripts.win",
+   LoadingTitle = "Tornado scripts",
+   LoadingSubtitle = "by community",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "TornadoScripts",
+      FileName = "config"
+   },
+   Discord = {
+      Enabled = false,
+      Invite = "noinvite",
+      RememberJoins = true
+   },
+   KeySystem = false,
+   KeySettings = {
+      Title = "Tornado scripts",
+      Subtitle = "Key System",
+      Note = "No key required",
+      FileName = "TornadoKey",
+      SaveKey = true,
+      GrabKeyFromSite = false,
+      Key = {"\x00"}
+   }
+})
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- Aimbot Variables
+local AimbotEnabled = false
+local AimFOV = 100
+local MaxDistance = 500
+local WallCheck = false
+local PredictionTime = 0.05 -- Время предикта для аимбота и точек визуализации
+local AimSmooth = 0.2 -- Плавность аимбота (чем меньше, тем плавнее)
+
+-- Visuals Variables (ESP / Chams / Tracers)
+local ESPBoxes = false
+local ChamsEnabled = false
+local TracersEnabled = false
+
+-- Misc & Auto-Strafe Variables
+local SpeedHack = false
+local SpeedValue = 16
+local JumpHack = false
+local JumpPower = 50
+local BunnyHop = false
+local AutoStrafeEnabled = false
+local StrafeForce = 15
+local MaxAirSpeed = 28
+
+-- Active ESP storage table to handle persistent Drawing objects safely
+local ESPStorage = {}
+
+local function CleanupESP(player)
+    if ESPStorage[player] then
+        if ESPStorage[player].Box then pcall(function() ESPStorage[player].Box:Remove() end) end
+        if ESPStorage[player].Tracer then pcall(function() ESPStorage[player].Tracer:Remove() end) end
+        if ESPStorage[player].PredictDot then pcall(function() ESPStorage[player].PredictDot:Remove() end) end
+        if ESPStorage[player].Highlight and ESPStorage[player].Highlight.Parent then
+            ESPStorage[player].Highlight:Destroy()
+        end
+        ESPStorage[player] = nil
+    end
+end
+
+-- Robust Wall Check function
+local function IsVisible(targetPart, origin)
+    if not WallCheck then return true end
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+    
+    local result = Workspace:Raycast(origin, targetPart.Position - origin, raycastParams)
+    if result then
+        local hitPart = result.Instance
+        if hitPart:IsDescendantOf(targetPart.Parent) then
+            return true
+        end
+        return false
+    end
+    return true
+end
+
+-- Rayfield UI Tabs & Controls Setup
+local AimbotTab = Window:CreateTab("Aimbot", 4483362458)
+AimbotTab:CreateSection("Rage Aimbot")
+
+AimbotTab:CreateToggle({
+   Name = "Enable Aimbot",
+   CurrentValue = false,
+   Callback = function(Value)
+      AimbotEnabled = Value
+   end,
+})
+
+AimbotTab:CreateSlider({
+   Name = "FOV (Radius)",
+   Range = {50, 400},
+   Increment = 5,
+   CurrentValue = 100,
+   Flag = "AimFOV",
+   Callback = function(Value)
+      AimFOV = Value
+   end,
+})
+
+AimbotTab:CreateSlider({
+   Name = "Smoothness",
+   Range = {0.01, 1},
+   Increment = 0.01,
+   CurrentValue = 0.2,
+   Callback = function(Value)
+      AimSmooth = Value
+   end,
+})
+
+AimbotTab:CreateSlider({
+   Name = "Max Distance",
+   Range = {100, 2000},
+   Increment = 10,
+   CurrentValue = 500,
+   Callback = function(Value)
+      MaxDistance = Value
+   end,
+})
+
+AimbotTab:CreateToggle({
+   Name = "Wall Check",
+   CurrentValue = false,
+   Callback = function(Value)
+      WallCheck = Value
+   end,
+})
+
+-- Visuals Tab
+local VisualsTab = Window:CreateTab("Visuals", 4483362458)
+VisualsTab:CreateSection("ESP & Chams")
+
+VisualsTab:CreateToggle({
+   Name = "Box ESP",
+   CurrentValue = false,
+   Callback = function(Value)
+      ESPBoxes = Value
+   end,
+})
+
+VisualsTab:CreateToggle({
+   Name = "Chams",
+   CurrentValue = false,
+   Callback = function(Value)
+      ChamsEnabled = Value
+   end,
+})
+
+VisualsTab:CreateToggle({
+   Name = "Tracers",
+   CurrentValue = false,
+   Callback = function(Value)
+      TracersEnabled = Value
+   end,
+})
+
+-- Misc Tab
+local MiscTab = Window:CreateTab("Misc", 4483362458)
+MiscTab:CreateSection("Player Modifications & Movement")
+
+MiscTab:CreateToggle({
+   Name = "Mobile Auto-Strafe",
+   CurrentValue = false,
+   Callback = function(Value)
+      AutoStrafeEnabled = Value
+   end,
+})
+
+MiscTab:CreateToggle({
+   Name = "Speedhack",
+   CurrentValue = false,
+   Callback = function(Value)
+      SpeedHack = Value
+   end,
+})
+
+MiscTab:CreateSlider({
+   Name = "Speed Value",
+   Range = {16, 100},
+   Increment = 1,
+   CurrentValue = 16,
+   Callback = function(Value)
+      SpeedValue = Value
+   end,
+})
+
+MiscTab:CreateToggle({
+   Name = "Jumphack",
+   CurrentValue = false,
+   Callback = function(Value)
+      JumpHack = Value
+   end,
+})
+
+MiscTab:CreateSlider({
+   Name = "Jump Power",
+   Range = {50, 200},
+   Increment = 1,
+   CurrentValue = 50,
+   Callback = function(Value)
+      JumpPower = Value
+   end,
+})
+
+MiscTab:CreateToggle({
+   Name = "BunnyHop",
+   CurrentValue = false,
+   Callback = function(Value)
+      BunnyHop = Value
+   end,
+})
+
+MiscTab:CreateParagraph({Title = "Telegram Channel", Content = "https://t.me/tornadoscripts"})
+
+-- Handle player cleanup on leave
+Players.PlayerRemoving:Connect(function(player)
+    CleanupESP(player)
+end)
+
+-- Main Render Loop (Aimbot, Visuals, Auto-Strafe, Misc)
+RunService.RenderStepped:Connect(function(dt)
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local validTargets = {}
+
+    -- Сбор валидных целей
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local char = player.Character
+            if char and char:FindFirstChild("Head") and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+                local hrp = char.HumanoidRootPart
+                local head = char.Head
+                
+                local distanceToPlayer = (hrp.Position - Camera.CFrame.Position).Magnitude
+                if distanceToPlayer <= MaxDistance then
+                    if not WallCheck or IsVisible(head, Camera.CFrame.Position) then
+                        table.insert(validTargets, {
+                            Player = player,
+                            Character = char,
+                            Head = head,
+                            HRP = hrp,
+                            Distance = distanceToPlayer
+                        })
+                    end
+                end
+            end
+        end
+    end
+
+    table.sort(validTargets, function(a, b)
+        return a.Distance < b.Distance
+    end)
+
+    -- 1. Rage Aimbot с Предиктом по топ-2 целям
+    local closestTargetPos = nil
+    local shortestFovDist = math.huge
+
+    for i = 1, math.min(2, #validTargets) do
+        local target = validTargets[i]
+        local velocity = target.HRP.AssemblyLinearVelocity or Vector3.new(0,0,0)
+        local predictedPosition = target.Head.Position + (velocity * PredictionTime)
+        
+        local screenPoint, onScreen = Camera:WorldToViewportPoint(predictedPosition)
+        if onScreen then
+            local screenPos2D = Vector2.new(screenPoint.X, screenPoint.Y)
+            local fovDistance = (screenPos2D - screenCenter).Magnitude
+
+            if fovDistance <= AimFOV then
+                if fovDistance < shortestFovDist then
+                    shortestFovDist = fovDistance
+                    closestTargetPos = predictedPosition
+                end
+            end
+        end
+    end
+
+    if AimbotEnabled and closestTargetPos then
+        Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, closestTargetPos), AimSmooth)
+    end
+
+    -- 2. Visuals Loop (ESP Box, Tracers, Chams, PredictDot)
+    local activePlayers = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            activePlayers[player] = true
+            local char = player.Character
+            
+            if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Head") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+                local hrp = char.HumanoidRootPart
+                local head = char.Head
+                
+                if not ESPStorage[player] then
+                    ESPStorage[player] = {
+                        Box = Drawing.new("Square"),
+                        Tracer = Drawing.new("Line"),
+                        PredictDot = Drawing.new("Circle")
+                    }
+                    ESPStorage[player].Box.Thickness = 1.5
+                    ESPStorage[player].Box.Filled = false
+                    ESPStorage[player].Tracer.Thickness = 1.5
+                    ESPStorage[player].PredictDot.Radius = 5
+                    ESPStorage[player].PredictDot.Filled = true
+                    ESPStorage[player].PredictDot.Color = Color3.fromRGB(255, 255, 0)
+                end
+                
+                local data = ESPStorage[player]
+                local rootScreen, rootOnScreen = Camera:WorldToViewportPoint(hrp.Position)
+                local headScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                local legScreen = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+                
+                local velocity = hrp.AssemblyLinearVelocity or Vector3.new(0,0,0)
+                local predictedPosition = head.Position + (velocity * PredictionTime)
+                local predScreen, predOnScreen = Camera:WorldToViewportPoint(predictedPosition)
+
+                local visible = IsVisible(head, Camera.CFrame.Position)
+                local dynamicColor = visible and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+
+                -- Box ESP Rendering
+                if ESPBoxes and rootOnScreen then
+                    local height = math.abs(headScreen.Y - legScreen.Y)
+                    local width = height / 2
+                    data.Box.Size = Vector2.new(width, height)
+                    data.Box.Position = Vector2.new(rootScreen.X - width / 2, headScreen.Y)
+                    data.Box.Color = dynamicColor
+                    data.Box.Visible = true
+                else
+                    data.Box.Visible = false
+                end
+
+                -- Tracers Rendering
+                if TracersEnabled and rootOnScreen then
+                    data.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    data.Tracer.To = Vector2.new(rootScreen.X, rootScreen.Y)
+                    data.Tracer.Color = dynamicColor
+                    data.Tracer.Visible = true
+                else
+                    data.Tracer.Visible = false
+                end
+
+                -- Predict Dot Rendering для топ-2 целей
+                local isTop2 = false
+                for i = 1, math.min(2, #validTargets) do
+                    if validTargets[i].Player == player then
+                        isTop2 = true
+                        break
+                    end
+                end
+
+                if isTop2 and predOnScreen then
+                    data.PredictDot.Position = Vector2.new(predScreen.X, predScreen.Y)
+                    data.PredictDot.Visible = true
+                else
+                    data.PredictDot.Visible = false
+                end
+
+                -- Chams / Highlight Rendering
+                local highlight = char:FindFirstChild("TornadoHighlight")
+                if ChamsEnabled then
+                    if not highlight then
+                        highlight = Instance.new("Highlight")
+                        highlight.Name = "TornadoHighlight"
+                        highlight.Adornee = char
+                        highlight.Parent = char
+                    end
+                    highlight.FillColor = dynamicColor
+                    highlight.OutlineColor = dynamicColor
+                else
+                    if highlight then highlight:Destroy() end
+                end
+            else
+                if ESPStorage[player] then
+                    if ESPStorage[player].Box then ESPStorage[player].Box.Visible = false end
+                    if ESPStorage[player].Tracer then ESPStorage[player].Tracer.Visible = false end
+                    if ESPStorage[player].PredictDot then ESPStorage[player].PredictDot.Visible = false end
+                end
+                local highlight = char and char:FindFirstChild("TornadoHighlight")
+                if highlight then highlight:Destroy() end
+            end
+        end
+    end
+
+    -- Cleanup players who left the server
+    for player, _ in pairs(ESPStorage) do
+        if not activePlayers[player] then
+            CleanupESP(player)
+        end
+    end
+
+    -- 3. Mobile Auto-Strafe Logic
+    local char = LocalPlayer.Character
+    if char then
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        
+        if humanoid and hrp then
+            if AutoStrafeEnabled and humanoid.FloorMaterial == Enum.Material.Air then
+                local moveDir = humanoid.MoveDirection
+                if moveDir.Magnitude > 0 then
+                    local camCF = Camera.CFrame
+                    local worldMoveDir = (camCF.RightVector * moveDir.X + camCF.LookVector * moveDir.Z)
+                    worldMoveDir = Vector3.new(worldMoveDir.X, 0, worldMoveDir.Z)
+                    
+                    if worldMoveDir.Magnitude > 0 then
+                        worldMoveDir = worldMoveDir.Unit
+                        local currentVel = hrp.AssemblyLinearVelocity
+                        local horizontalVel = Vector3.new(currentVel.X, 0, currentVel.Z)
+                        
+                        if horizontalVel.Magnitude < MaxAirSpeed then
+                            hrp:ApplyImpulse(worldMoveDir * StrafeForce * dt * 60)
+                        end
+                    end
+                end
+            end
+
+            -- 4. Standard Misc Logic
+            if SpeedHack then
+                humanoid.WalkSpeed = SpeedValue
+            end
+            if JumpHack then
+                humanoid.JumpPower = JumpPower
+            end
+            if BunnyHop and humanoid.FloorMaterial ~= Enum.Material.Air then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end
+end)
 

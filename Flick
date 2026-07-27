@@ -774,22 +774,32 @@ RunService.RenderStepped:Connect(function()
             end
 
             if getgenv().TornadoConfig.Player.BHop then
-                if humanoid:GetState() == Enum.HumanoidStateType.Jumping and humanoid.FloorMaterial ~= Enum.Material.Air then
-                    humanoid.Jump = true
+                if humanoid:GetState() == Enum.HumanoidStateType.Jumping or humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+                    if humanoid.FloorMaterial ~= Enum.Material.Air then
+                        humanoid.Jump = true
+                    end
                 end
             end
 
             if getgenv().TornadoConfig.Player.AutoStrafer then
                 local rootPart = character:FindFirstChild("HumanoidRootPart")
                 if rootPart then
-                    local velocity = rootPart.Velocity
-                    if velocity.Magnitude > 5 then
-                        local right = Camera.CFrame.RightVector
-                        local dir = Vector3.new(right.X, 0, right.Z).Unit
-                        rootPart.Velocity = Vector3.new(dir.X * velocity.Magnitude, velocity.Y, dir.Z * velocity.Magnitude)
+                    -- Автострейфер по направлению взгляда камеры (в сторону куда смотрит игрок)
+                    local camVector = Camera.CFrame.LookVector
+                    local moveDir = Vector3.new(camVector.X, 0, camVector.Z)
+                    
+                    if moveDir.Magnitude > 0 then
+                        moveDir = moveDir.Unit
+                        local currentVel = rootPart.Velocity
+                        local yVel = currentVel.Y
+                        
+                        -- Ускорение в воздухе в сторону взгляда с сохранением инерции
+                        local targetSpeed = math.max(math.sqrt(currentVel.X^2 + currentVel.Z^2), getgenv().TornadoConfig.Player.Speed)
+                        rootPart.Velocity = Vector3.new(moveDir.X * targetSpeed, yVel, moveDir.Z * targetSpeed)
                     end
                 end
             end
+
 
             if getgenv().TornadoConfig.Player.DoubleJump then
                 if not getgenv()._doubleJump then getgenv()._doubleJump = 0 end

@@ -1,0 +1,497 @@
+-- Tornado Scripts | Bloxstrike
+-- ============================================================
+-- 1. СЕРВИСЫ
+-- ============================================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- ============================================================
+-- 2. НАСТРОЙКИ
+-- ============================================================
+local Settings = {
+    WallHackEnabled = true,
+    EnemyColor = Color3.fromRGB(255, 30, 30),
+    FillTransparency = 0.5,
+    MaxRenderDistance = 1500,
+}
+
+-- ============================================================
+-- 3. УДАЛЕНИЕ СТАРЫХ GUI
+-- ============================================================
+for _, v in ipairs(CoreGui:GetChildren()) do
+    if v.Name == "TornadoMenu" then
+        v:Destroy()
+    end
+end
+
+-- ============================================================
+-- 4. СОЗДАНИЕ GUI МЕНЮ
+-- ============================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TornadoMenu"
+ScreenGui.Parent = CoreGui
+ScreenGui.ResetOnSpawn = false
+
+-- Плавающая кнопка открытия меню
+local FloatingButton = Instance.new("ImageButton")
+FloatingButton.Size = UDim2.new(0, 55, 0, 55)
+FloatingButton.Position = UDim2.new(1, -70, 1, -80)
+FloatingButton.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+FloatingButton.BackgroundTransparency = 0.2
+FloatingButton.Image = "rbxassetid://0"
+FloatingButton.BorderSizePixel = 0
+FloatingButton.Parent = ScreenGui
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(1, 0)
+btnCorner.Parent = FloatingButton
+
+local BtnText = Instance.new("TextLabel")
+BtnText.Size = UDim2.new(1, 0, 1, 0)
+BtnText.BackgroundTransparency = 1
+BtnText.Text = "T"
+BtnText.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnText.TextSize = 28
+BtnText.Font = Enum.Font.GothamBold
+BtnText.Parent = FloatingButton
+
+-- Перетаскивание кнопки
+local isDraggingBtn = false
+local dragStartBtn, startPosBtn
+FloatingButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDraggingBtn = true
+        dragStartBtn = input.Position
+        startPosBtn = FloatingButton.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if isDraggingBtn and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        local delta = input.Position - dragStartBtn
+        local newX = startPosBtn.X.Offset + delta.X
+        local newY = startPosBtn.Y.Offset + delta.Y
+        FloatingButton.Position = UDim2.new(0, math.clamp(newX, 0, Camera.ViewportSize.X - 55),
+                                            0, math.clamp(newY, 0, Camera.ViewportSize.Y - 55))
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDraggingBtn = false
+    end
+end)
+
+-- Главное окно меню
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 360, 0, 380)
+MainFrame.Position = UDim2.new(0.5, -180, 0.5, -190)
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+MainFrame.BackgroundTransparency = 0.05
+MainFrame.BorderSizePixel = 1
+MainFrame.BorderColor3 = Color3.fromRGB(255, 150, 50)
+MainFrame.ClipsDescendants = true
+MainFrame.Visible = false
+MainFrame.Parent = ScreenGui
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
+
+-- Заголовок
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
+TitleBar.BackgroundTransparency = 0.2
+TitleBar.Parent = MainFrame
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = TitleBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -50, 1, 0)
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "Tornado Scripts"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 18
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.Parent = TitleBar
+
+local SubLabel = Instance.new("TextLabel")
+SubLabel.Size = UDim2.new(1, -50, 0.5, 0)
+SubLabel.Position = UDim2.new(0, 10, 0.5, 0)
+SubLabel.BackgroundTransparency = 1
+SubLabel.Text = "Bloxstrike | WH"
+SubLabel.TextColor3 = Color3.fromRGB(150, 150, 180)
+SubLabel.TextSize = 11
+SubLabel.TextXAlignment = Enum.TextXAlignment.Left
+SubLabel.Font = Enum.Font.Gotham
+SubLabel.Parent = TitleBar
+
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -35, 0.5, -15)
+CloseButton.BackgroundTransparency = 1
+CloseButton.Text = "✕"
+CloseButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+CloseButton.TextSize = 18
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Parent = TitleBar
+
+-- ============================================================
+-- 5. ОБЛАСТЬ СОДЕРЖИМОГО (без вкладок)
+-- ============================================================
+local ContentFrame = Instance.new("ScrollingFrame")
+ContentFrame.Size = UDim2.new(1, -10, 1, -50)
+ContentFrame.Position = UDim2.new(0, 5, 0, 45)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.BorderSizePixel = 0
+ContentFrame.ScrollBarThickness = 4
+ContentFrame.ScrollBarImageColor3 = Color3.fromRGB(255, 150, 50)
+ContentFrame.Parent = MainFrame
+
+local UIList = Instance.new("UIListLayout")
+UIList.SortOrder = Enum.SortOrder.LayoutOrder
+UIList.Padding = UDim.new(0, 6)
+UIList.Parent = ContentFrame
+
+UIList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ContentFrame.CanvasSize = UDim2.new(0, 0, 0, UIList.AbsoluteContentSize.Y + 10)
+end)
+
+-- ============================================================
+-- 6. ЭЛЕМЕНТЫ УПРАВЛЕНИЯ
+-- ============================================================
+local function CreateToggle(label, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 34)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    frame.Parent = ContentFrame
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+
+    local labelText = Instance.new("TextLabel")
+    labelText.Size = UDim2.new(0.65, -10, 1, 0)
+    labelText.Position = UDim2.new(0, 10, 0, 0)
+    labelText.BackgroundTransparency = 1
+    labelText.Text = label
+    labelText.TextColor3 = Color3.fromRGB(235, 235, 245)
+    labelText.TextSize = 14
+    labelText.Font = Enum.Font.Gotham
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.Parent = frame
+
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Size = UDim2.new(0, 44, 0, 24)
+    toggleBtn.Position = UDim2.new(1, -48, 0.5, -12)
+    toggleBtn.BackgroundColor3 = default and Color3.fromRGB(255, 150, 50) or Color3.fromRGB(55, 55, 75)
+    toggleBtn.Text = ""
+    toggleBtn.Parent = frame
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 12)
+    btnCorner.Parent = toggleBtn
+
+    local status = default
+    toggleBtn.MouseButton1Click:Connect(function()
+        status = not status
+        toggleBtn.BackgroundColor3 = status and Color3.fromRGB(255, 150, 50) or Color3.fromRGB(55, 55, 75)
+        callback(status)
+    end)
+end
+
+local function CreateSlider(label, min, max, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 44)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    frame.Parent = ContentFrame
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+
+    local labelText = Instance.new("TextLabel")
+    labelText.Size = UDim2.new(1, 0, 0, 20)
+    labelText.Position = UDim2.new(0, 10, 0, 4)
+    labelText.BackgroundTransparency = 1
+    labelText.Text = label .. ": " .. tostring(default)
+    labelText.TextColor3 = Color3.fromRGB(235, 235, 245)
+    labelText.TextSize = 14
+    labelText.Font = Enum.Font.Gotham
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.Parent = frame
+
+    local slider = Instance.new("Frame")
+    slider.Size = UDim2.new(1, -20, 0, 8)
+    slider.Position = UDim2.new(0, 10, 0, 30)
+    slider.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
+    slider.Parent = frame
+    local sliderCorner = Instance.new("UICorner")
+    sliderCorner.CornerRadius = UDim.new(0, 4)
+    sliderCorner.Parent = slider
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
+    fill.Parent = slider
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(0, 4)
+    fillCorner.Parent = fill
+
+    local dragging = false
+    local function updateSlider(input)
+        local relX = math.clamp((input.Position.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
+        local val = math.floor((min + (max - min) * relX) + 0.5)
+        val = math.clamp(val, min, max)
+        fill.Size = UDim2.new((val - min) / (max - min), 0, 1, 0)
+        labelText.Text = label .. ": " .. tostring(val)
+        callback(val)
+    end
+
+    slider.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            updateSlider(input)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            updateSlider(input)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+end
+
+local function CreateColorPicker(label, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 34)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    frame.Parent = ContentFrame
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+
+    local labelText = Instance.new("TextLabel")
+    labelText.Size = UDim2.new(0.6, -10, 1, 0)
+    labelText.Position = UDim2.new(0, 10, 0, 0)
+    labelText.BackgroundTransparency = 1
+    labelText.Text = label
+    labelText.TextColor3 = Color3.fromRGB(235, 235, 245)
+    labelText.TextSize = 14
+    labelText.Font = Enum.Font.Gotham
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.Parent = frame
+
+    local colorDisplay = Instance.new("TextButton")
+    colorDisplay.Size = UDim2.new(0, 30, 0, 22)
+    colorDisplay.Position = UDim2.new(0.85, 0, 0.5, -11)
+    colorDisplay.BackgroundColor3 = default
+    colorDisplay.Text = ""
+    colorDisplay.Parent = frame
+    local colorCorner = Instance.new("UICorner")
+    colorCorner.CornerRadius = UDim.new(0, 6)
+    colorCorner.Parent = colorDisplay
+
+    local colors = {
+        Color3.fromRGB(255,0,0), Color3.fromRGB(0,255,0), Color3.fromRGB(0,0,255),
+        Color3.fromRGB(255,255,0), Color3.fromRGB(255,0,255), Color3.fromRGB(0,255,255),
+        Color3.fromRGB(255,255,255), Color3.fromRGB(255,150,50)
+    }
+    local idx = 1
+    for i, col in ipairs(colors) do
+        if col == default then idx = i end
+    end
+
+    colorDisplay.MouseButton1Click:Connect(function()
+        idx = idx % #colors + 1
+        local col = colors[idx]
+        colorDisplay.BackgroundColor3 = col
+        callback(col)
+    end)
+end
+
+-- ============================================================
+-- 7. ЗАПОЛНЕНИЕ МЕНЮ (только WH)
+-- ============================================================
+CreateToggle("WallHack", true, function(v)
+    Settings.WallHackEnabled = v
+end)
+
+CreateColorPicker("Цвет врагов", Color3.fromRGB(255, 30, 30), function(v)
+    Settings.EnemyColor = v
+    for _, highlight in pairs(activeHighlights) do
+        highlight.FillColor = v
+    end
+end)
+
+CreateSlider("Прозрачность", 0, 100, 50, function(v)
+    Settings.FillTransparency = v / 100
+    for _, highlight in pairs(activeHighlights) do
+        highlight.FillTransparency = v / 100
+    end
+end)
+
+CreateSlider("Дистанция", 500, 3000, 1500, function(v)
+    Settings.MaxRenderDistance = v
+end)
+
+-- Отступ внизу
+local pad = Instance.new("Frame")
+pad.Size = UDim2.new(1, 0, 0, 10)
+pad.BackgroundTransparency = 1
+pad.Parent = ContentFrame
+
+-- ============================================================
+-- 8. УПРАВЛЕНИЕ ОТОБРАЖЕНИЕМ МЕНЮ
+-- ============================================================
+local menuVisible = false
+FloatingButton.MouseButton1Click:Connect(function()
+    menuVisible = not menuVisible
+    MainFrame.Visible = menuVisible
+    FloatingButton.BackgroundColor3 = menuVisible and Color3.fromRGB(60, 60, 80) or Color3.fromRGB(25, 25, 35)
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+    menuVisible = false
+    MainFrame.Visible = false
+    FloatingButton.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+end)
+
+-- Перетаскивание окна
+local dragWindow = false
+local dragStartWin, startPosWin
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragWindow = true
+        dragStartWin = input.Position
+        startPosWin = MainFrame.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragWindow and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        local delta = input.Position - dragStartWin
+        MainFrame.Position = UDim2.new(startPosWin.X.Scale, startPosWin.X.Offset + delta.X,
+                                       startPosWin.Y.Scale, startPosWin.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragWindow = false
+    end
+end)
+
+-- ============================================================
+-- 9. ЛОГИКА WALLHACK (Highlight)
+-- ============================================================
+local activeHighlights = {}
+local LocalTeam = nil
+
+local function GetLocalTeam()
+    if LocalTeam then return LocalTeam end
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    local characters = Workspace:FindFirstChild("Characters")
+    if not characters then return nil end
+    for _, folder in ipairs(characters:GetChildren()) do
+        if folder:IsA("Folder") and folder:FindFirstChild(char.Name) then
+            LocalTeam = folder.Name
+            return LocalTeam
+        end
+    end
+    return nil
+end
+
+local function IsEnemy(character)
+    if not character or not character.Parent then return false end
+    local teamFolder = character.Parent
+    if not teamFolder:IsA("Folder") then return false end
+    if teamFolder.Name == "Hostages" then return false end
+    local localTeam = GetLocalTeam()
+    if not localTeam then return true end
+    return teamFolder.Name ~= localTeam
+end
+
+local function ApplyHighlight(character)
+    if activeHighlights[character] then return end
+    if not IsEnemy(character) then return end
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "TornadoWH"
+    highlight.Adornee = character
+    highlight.Parent = character
+    highlight.FillColor = Settings.EnemyColor
+    highlight.FillTransparency = Settings.FillTransparency
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    activeHighlights[character] = highlight
+end
+
+local function RemoveHighlight(character)
+    if activeHighlights[character] then
+        activeHighlights[character]:Destroy()
+        activeHighlights[character] = nil
+    end
+end
+
+local function ProcessCharacter(character)
+    if not character:IsA("Model") then return end
+    if character == LocalPlayer.Character then return end
+    if not character:FindFirstChild("Humanoid") then return end
+    if IsEnemy(character) and Settings.WallHackEnabled then
+        ApplyHighlight(character)
+    else
+        RemoveHighlight(character)
+    end
+end
+
+local charactersFolder = Workspace:FindFirstChild("Characters")
+if charactersFolder then
+    for _, folder in ipairs(charactersFolder:GetChildren()) do
+        if folder:IsA("Folder") then
+            for _, character in ipairs(folder:GetChildren()) do
+                ProcessCharacter(character)
+            end
+            folder.ChildAdded:Connect(function(character)
+                task.wait(0.1)
+                ProcessCharacter(character)
+            end)
+            folder.ChildRemoved:Connect(RemoveHighlight)
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if not Settings.WallHackEnabled then
+        for _, highlight in pairs(activeHighlights) do
+            highlight.Enabled = false
+        end
+        return
+    end
+    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+    for character, highlight in pairs(activeHighlights) do
+        if character and character.Parent then
+            local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso")
+            if root then
+                local dist = (myRoot.Position - root.Position).Magnitude
+                highlight.Enabled = dist <= Settings.MaxRenderDistance
+            else
+                highlight.Enabled = false
+            end
+        else
+            RemoveHighlight(character)
+        end
+    end
+end)
+
+-- Обновление команды
+LocalPlayer.CharacterAdded:Connect(function()
+    LocalTeam = nil
+end)

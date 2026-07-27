@@ -1,0 +1,1138 @@
+=== ОТЧЕТ ПО ОБЪЕКТУ: StarterGui.MobileControls ===
+Класс: ScreenGui
+Дата экспорта: 2026-07-27 13:58:05
+Режим: Safe
+==================================================
+
+📂 [ScreenGui] MobileControls
+  📂 [LocalScript] LocalScript
+    📜 КОД СКРИПТА:
+      local v_u_1 = game:GetService("UserInputService")
+      local v2 = game:GetService("ReplicatedStorage")
+      local v3 = game:GetService("Players")
+      local v_u_4 = script:FindFirstAncestorOfClass("ScreenGui")
+      local _ = v3.LocalPlayer
+      local v_u_5 = require(v2:WaitForChild("SignalManager"))
+      v2:WaitForChild("Remotes"):WaitForChild("Command")
+      local v6 = v_u_4:FindFirstChild("Lobby", true)
+      local v_u_7 = v_u_4:FindFirstChild("FireButton", true)
+      local v_u_8 = v_u_4:FindFirstChild("AimButton", true)
+      local v9 = v_u_4:FindFirstChild("Swap", true)
+      local v10 = v_u_4:FindFirstChild("ReloadButton", true)
+      local v11 = v_u_4:FindFirstChild("Inspect", true)
+      local v_u_12 = v_u_4:FindFirstChild("Out", true)
+      local v_u_13 = script.Parent.HoldAim
+      local v14 = v_u_4:FindFirstChild("Pos", true)
+      local v_u_15 = v_u_4:FindFirstChild("resetPos", true)
+      local v_u_16 = v_u_4:FindFirstChild("SavePos", true)
+      local v_u_17 = {
+      	v6,
+      	v_u_7,
+      	v_u_8,
+      	v9,
+      	v10,
+      	v11
+      }
+      local v_u_18 = Color3.fromRGB(91, 91, 91)
+      local v_u_19 = Color3.fromRGB(27, 27, 27)
+      local v_u_20 = Color3.new(0.231373, 0.564706, 0.156863)
+      local v_u_21 = {}
+      local v_u_22 = false
+      local v_u_23 = {}
+      local v_u_24 = true
+      local v_u_25 = false
+      local v_u_26 = false
+      for _, v27 in ipairs(v_u_17) do
+      	if v27 then
+      		v_u_21[v27] = v27.Position
+      	end
+      end
+      v_u_12.InputBegan:Connect(function(p28, p29)
+      	-- upvalues: (ref) v_u_26, (ref) v_u_22, (copy) v_u_23
+      	if p28.UserInputType == Enum.UserInputType.Touch and not p29 then
+      		if v_u_26 then
+      			return
+      		end
+      		v_u_22 = true
+      		v_u_23[p28] = true
+      	end
+      end)
+      local v_u_30 = false
+      v_u_12.InputEnded:Connect(function(p31, p32)
+      	-- upvalues: (ref) v_u_26, (copy) v_u_7, (copy) v_u_19, (ref) v_u_30, (copy) v_u_5, (ref) v_u_24, (ref) v_u_22, (copy) v_u_23
+      	if p31.UserInputType == Enum.UserInputType.Touch and not p32 then
+      		if v_u_26 then
+      			return
+      		end
+      		v_u_7.BackgroundColor3 = v_u_19
+      		if v_u_30 == true then
+      			v_u_30 = false
+      			v_u_5.Fire("FireWeaponMoblie", Enum.UserInputState.Begin)
+      			if v_u_24 then
+      				v_u_5.Fire("AimWeapon", Enum.UserInputState.End)
+      			end
+      		end
+      		v_u_22 = false
+      		v_u_23[p31] = nil
+      	end
+      end)
+      v_u_7.InputBegan:Connect(function(p33)
+      	-- upvalues: (ref) v_u_26, (copy) v_u_23, (ref) v_u_30, (copy) v_u_5, (copy) v_u_7, (copy) v_u_18, (ref) v_u_24
+      	if p33.UserInputType == Enum.UserInputType.Touch then
+      		if v_u_26 then
+      			return
+      		end
+      		if v_u_23[p33] then
+      			return
+      		end
+      		v_u_30 = true
+      		v_u_5.Fire("FireWeaponMoblie", Enum.UserInputState.End)
+      		v_u_7.BackgroundColor3 = v_u_18
+      		if v_u_24 and v_u_30 == true then
+      			v_u_5.Fire("AimWeapon", Enum.UserInputState.Begin)
+      		end
+      	end
+      end)
+      v10.InputBegan:Connect(function(p34)
+      	-- upvalues: (ref) v_u_26, (copy) v_u_23, (copy) v_u_5
+      	if p34.UserInputType == Enum.UserInputType.Touch then
+      		if v_u_26 then
+      			return
+      		end
+      		if v_u_23[p34] then
+      			return
+      		end
+      		v_u_5.Fire("ReloadWeapon")
+      	end
+      end)
+      v_u_8.InputBegan:Connect(function(p35)
+      	-- upvalues: (ref) v_u_26, (copy) v_u_23, (ref) v_u_25, (ref) v_u_24, (copy) v_u_5
+      	if p35.UserInputType == Enum.UserInputType.Touch then
+      		if v_u_26 then
+      			return
+      		end
+      		if v_u_23[p35] then
+      			return
+      		end
+      		if v_u_25 and not v_u_24 then
+      			v_u_5.Fire("AimWeapon", Enum.UserInputState.End)
+      			return
+      		end
+      		v_u_5.Fire("AimWeapon", Enum.UserInputState.Begin)
+      	end
+      end)
+      v9.InputBegan:Connect(function(p36)
+      	-- upvalues: (ref) v_u_26, (copy) v_u_23, (copy) v_u_5
+      	if p36.UserInputType == Enum.UserInputType.Touch then
+      		if v_u_26 then
+      			return
+      		end
+      		if v_u_23[p36] then
+      			return
+      		end
+      		v_u_5.Fire("SwapWeapon")
+      	end
+      end)
+      v11.InputBegan:Connect(function(p37)
+      	-- upvalues: (ref) v_u_26, (copy) v_u_23, (copy) v_u_5
+      	if p37.UserInputType == Enum.UserInputType.Touch then
+      		if v_u_26 then
+      			return
+      		end
+      		if v_u_23[p37] then
+      			return
+      		end
+      		v_u_5.Fire("InspectWeapon")
+      	end
+      end)
+      v6.Activated:Connect(function()
+      	-- upvalues: (ref) v_u_26, (copy) v_u_5
+      	if not v_u_26 then
+      		v_u_5.Fire("Lobby", Enum.UserInputState.Begin)
+      	end
+      end)
+      v_u_13.Activated:Connect(function()
+      	-- upvalues: (ref) v_u_26, (ref) v_u_24, (copy) v_u_13, (copy) v_u_19, (copy) v_u_20, (copy) v_u_8
+      	if not v_u_26 then
+      		v_u_24 = not v_u_24
+      		v_u_13.BackgroundColor3 = v_u_24 and v_u_19 or v_u_20
+      		v_u_8.Visible = not v_u_24
+      	end
+      end)
+      if v_u_15 then
+      	v_u_15.Visible = false
+      	v_u_15.Activated:Connect(function()
+      		-- upvalues: (ref) v_u_26, (copy) v_u_21
+      		if v_u_26 then
+      			for v38, v39 in pairs(v_u_21) do
+      				if v38 then
+      					v38:TweenPosition(v39, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+      				end
+      			end
+      		end
+      	end)
+      end
+      if v_u_16 then
+      	v_u_16.Visible = false
+      	v_u_16.Activated:Connect(function()
+      		-- upvalues: (copy) v_u_5
+      		v_u_5.Fire("MoblieLayoutPos")
+      	end)
+      end
+      v_u_5.Connect("AimStateChanged", function(p40)
+      	-- upvalues: (ref) v_u_25, (copy) v_u_8, (copy) v_u_18, (copy) v_u_19, (copy) v_u_5
+      	v_u_25 = p40
+      	v_u_8.BackgroundColor3 = v_u_25 and v_u_18 or v_u_19
+      	if p40 == false then
+      		v_u_5.Fire("AimWeapon", Enum.UserInputState.End)
+      	end
+      end)
+      v_u_5.Connect("MoblieLayoutPos", function(_)
+      	-- upvalues: (ref) v_u_26, (copy) v_u_4, (copy) v_u_17, (copy) v_u_12, (copy) v_u_15, (copy) v_u_16, (ref) v_u_24, (copy) v_u_8
+      	v_u_26 = not v_u_26
+      	v_u_4.Enabled = v_u_26
+      	v_u_4.Out.BackgroundTransparency = v_u_26 and 0.5 or 1
+      	for _, v41 in ipairs(v_u_17) do
+      		if v41 then
+      			v41.Draggable = v_u_26
+      			v41.Active = v_u_26
+      		end
+      	end
+      	v_u_12.Active = v_u_26
+      	if v_u_15 then
+      		v_u_15.Visible = v_u_26
+      	end
+      	if v_u_16 then
+      		v_u_16.Visible = v_u_26
+      	end
+      	if v_u_24 then
+      		v_u_8.Visible = v_u_26
+      	end
+      end)
+      v14.BackgroundColor3 = v_u_19
+      local v_u_42 = false
+      v_u_5.Connect("PlayerInLobby", function()
+      	-- upvalues: (ref) v_u_42, (copy) v_u_1, (copy) v_u_4
+      	v_u_42 = false
+      	local v43 = v_u_1:GetLastInputType()
+      	local v44 = v_u_42
+      	if v44 then
+      		v44 = v43 == Enum.UserInputType.Touch
+      	end
+      	if v_u_4.Enabled ~= v44 then
+      		v_u_4.Enabled = v44
+      	end
+      end)
+      v_u_5.Connect("PlayerInPlay", function()
+      	-- upvalues: (ref) v_u_42, (copy) v_u_1, (copy) v_u_4
+      	v_u_42 = true
+      	local v45 = v_u_1:GetLastInputType()
+      	local v46 = v_u_42
+      	if v46 then
+      		v46 = v45 == Enum.UserInputType.Touch
+      	end
+      	if v_u_4.Enabled ~= v46 then
+      		v_u_4.Enabled = v46
+      	end
+      end)
+      v_u_1.LastInputTypeChanged:Connect(function(_)
+      	-- upvalues: (copy) v_u_1, (ref) v_u_42, (copy) v_u_4
+      	local v47 = v_u_1:GetLastInputType()
+      	local v48 = v_u_42
+      	if v48 then
+      		v48 = v47 == Enum.UserInputType.Touch
+      	end
+      	if v_u_4.Enabled ~= v48 then
+      		v_u_4.Enabled = v48
+      	end
+      end)
+      v_u_4.Enabled = false
+      local v49 = v_u_1:GetLastInputType()
+      local v50 = v_u_42
+      if v50 then
+      	v50 = v49 == Enum.UserInputType.Touch
+      end
+      if v_u_4.Enabled ~= v50 then
+      	v_u_4.Enabled = v50
+      end
+    ------------------------------
+  📂 [LocalScript] New
+    📜 КОД СКРИПТА:
+      local v_u_1 = game:GetService("UserInputService")
+      local v2 = game:GetService("ReplicatedStorage")
+      local v3 = game:GetService("Players")
+      local v_u_4 = script:FindFirstAncestorOfClass("ScreenGui")
+      local v5 = v3.LocalPlayer:WaitForChild("PlayerScripts")
+      local v_u_6 = require(v5:WaitForChild("Data"))
+      local v_u_7 = require(v2:WaitForChild("SignalManager"))
+      v2:WaitForChild("Remotes"):WaitForChild("Command")
+      local v_u_8 = v2.Remotes:WaitForChild("UpdateSetting")
+      local v9 = v_u_4:FindFirstChild("Lobby", true)
+      local v_u_10 = v_u_4:FindFirstChild("FireButton", true)
+      local v_u_11 = v_u_4:FindFirstChild("AimButton", true)
+      local v12 = v_u_4:FindFirstChild("Swap", true)
+      local v13 = v_u_4:FindFirstChild("ReloadButton", true)
+      local v14 = v_u_4:FindFirstChild("Inspect", true)
+      local v_u_15 = v_u_4:FindFirstChild("Out", true)
+      local v_u_16 = script.Parent.HoldAim
+      local v17 = v_u_4:FindFirstChild("Pos", true)
+      local v_u_18 = v_u_4:FindFirstChild("resetPos", true)
+      local v_u_19 = v_u_4:FindFirstChild("SavePos", true)
+      local v_u_20 = {
+      	v9,
+      	v_u_10,
+      	v_u_11,
+      	v12,
+      	v13,
+      	v14
+      }
+      local v_u_21 = {
+      	["Lobby"] = {
+      		["ScaleX"] = 0.02,
+      		["OffsetX"] = 0,
+      		["ScaleY"] = 0.02,
+      		["OffsetY"] = 0
+      	},
+      	["FireButton"] = {
+      		["ScaleX"] = 0.261,
+      		["OffsetX"] = 0,
+      		["ScaleY"] = 0.639,
+      		["OffsetY"] = 0
+      	},
+      	["AimButton"] = {
+      		["ScaleX"] = 0.26,
+      		["OffsetX"] = 0,
+      		["ScaleY"] = 0.342,
+      		["OffsetY"] = 0
+      	},
+      	["Swap"] = {
+      		["ScaleX"] = 0.66,
+      		["OffsetX"] = 0,
+      		["ScaleY"] = 0.461,
+      		["OffsetY"] = 0
+      	},
+      	["ReloadButton"] = {
+      		["ScaleX"] = 0.664,
+      		["OffsetX"] = 0,
+      		["ScaleY"] = 0.532,
+      		["OffsetY"] = 0
+      	},
+      	["Inspect"] = {
+      		["ScaleX"] = 0.659,
+      		["OffsetX"] = 0,
+      		["ScaleY"] = 0.32,
+      		["OffsetY"] = 0
+      	}
+      }
+      local v_u_22 = true
+      local v_u_23 = false
+      local v_u_24 = false
+      local v_u_25 = Color3.fromRGB(91, 91, 91)
+      local v_u_26 = Color3.fromRGB(27, 27, 27)
+      local v_u_27 = Color3.new(0.231373, 0.564706, 0.156863)
+      local v_u_28 = false
+      local v_u_29 = {}
+      local v_u_30 = nil
+      local function v_u_36(p31) -- name: applyLayout
+      	-- upvalues: (copy) v_u_21, (copy) v_u_20
+      	if type(p31) ~= "table" then
+      		print("ERROR: Invalid layout data, applying default.")
+      		p31 = v_u_21
+      	end
+      	print("DEBUG: Applying mobile layout.")
+      	for _, v32 in ipairs(v_u_20) do
+      		if v32 then
+      			local v33 = p31[v32.Name]
+      			if not v33 then
+      				::l7::
+      				v33 = v_u_21[v32.Name]
+      				goto l8
+      			end
+      			local v34 = v33.ScaleX
+      			if type(v34) == "nil" then
+      				goto l7
+      			end
+      			::l8::
+      			if v33 then
+      				local v35 = v33.ScaleX
+      				if type(v35) == "nil" then
+      					goto l10
+      				end
+      				v32.Position = UDim2.new(v33.ScaleX, v33.OffsetX, v33.ScaleY, v33.OffsetY)
+      			else
+      				::l10::
+      				warn("No layout data found for button: " .. v32.Name)
+      			end
+      		end
+      	end
+      end
+      task.wait()
+      if v_u_6.Sett and v_u_6.Sett.MoblieLayout then
+      	print("DEBUG: Loading SAVED mobile layout.")
+      	v_u_36(v_u_6.Sett.MoblieLayout)
+      else
+      	print("DEBUG: No saved layout found. Applying DEFAULT layout.")
+      	v_u_36(v_u_21)
+      end
+      v_u_15.InputBegan:Connect(function(p37, p38)
+      	-- upvalues: (ref) v_u_24, (ref) v_u_28, (copy) v_u_29
+      	if p37.UserInputType == Enum.UserInputType.Touch and not p38 then
+      		if v_u_24 then
+      			return
+      		end
+      		v_u_28 = true
+      		v_u_29[p37] = true
+      	end
+      end)
+      v_u_15.InputEnded:Connect(function(p39, p40)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_29, (ref) v_u_28
+      	if p39.UserInputType == Enum.UserInputType.Touch and not p40 then
+      		if v_u_24 then
+      			return
+      		end
+      		if v_u_29[p39] then
+      			v_u_28 = false
+      			v_u_29[p39] = nil
+      		end
+      	end
+      end)
+      v_u_10.InputBegan:Connect(function(p41)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_29, (ref) v_u_30, (copy) v_u_7, (copy) v_u_10, (copy) v_u_25, (ref) v_u_22
+      	if p41.UserInputType == Enum.UserInputType.Touch then
+      		if v_u_24 then
+      			return
+      		end
+      		if v_u_29[p41] then
+      			return
+      		end
+      		if v_u_30 then
+      			return
+      		end
+      		v_u_30 = p41
+      		v_u_7.Fire("FireWeaponMoblie", Enum.UserInputState.End)
+      		v_u_10.BackgroundColor3 = v_u_25
+      		if v_u_22 and v_u_30 then
+      			v_u_7.Fire("AimWeapon", Enum.UserInputState.Begin)
+      		end
+      	end
+      end)
+      v13.InputBegan:Connect(function(p42)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_29, (copy) v_u_7
+      	if p42.UserInputType == Enum.UserInputType.Touch then
+      		if v_u_24 then
+      			return
+      		end
+      		if v_u_29[p42] then
+      			return
+      		end
+      		v_u_7.Fire("ReloadWeapon")
+      	end
+      end)
+      v_u_11.InputBegan:Connect(function(p43)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_29, (ref) v_u_23, (ref) v_u_22, (copy) v_u_7
+      	if p43.UserInputType == Enum.UserInputType.Touch then
+      		if v_u_24 then
+      			return
+      		end
+      		if v_u_29[p43] then
+      			return
+      		end
+      		if v_u_23 and not v_u_22 then
+      			v_u_7.Fire("AimWeapon", Enum.UserInputState.End)
+      			return
+      		end
+      		v_u_7.Fire("AimWeapon", Enum.UserInputState.Begin)
+      	end
+      end)
+      v12.InputBegan:Connect(function(p44)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_29, (copy) v_u_7
+      	if p44.UserInputType == Enum.UserInputType.Touch then
+      		if v_u_24 then
+      			return
+      		end
+      		if v_u_29[p44] then
+      			return
+      		end
+      		v_u_7.Fire("SwapWeapon")
+      	end
+      end)
+      v14.InputBegan:Connect(function(p45)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_29, (copy) v_u_7
+      	if p45.UserInputType == Enum.UserInputType.Touch then
+      		if v_u_24 then
+      			return
+      		end
+      		if v_u_29[p45] then
+      			return
+      		end
+      		v_u_7.Fire("InspectWeapon")
+      	end
+      end)
+      v9.Activated:Connect(function()
+      	-- upvalues: (ref) v_u_24, (copy) v_u_7
+      	if not v_u_24 then
+      		v_u_7.Fire("Lobby", Enum.UserInputState.Begin)
+      	end
+      end)
+      v_u_16.Activated:Connect(function()
+      	-- upvalues: (ref) v_u_24, (ref) v_u_22, (copy) v_u_16, (copy) v_u_26, (copy) v_u_27, (copy) v_u_11
+      	if not v_u_24 then
+      		v_u_22 = not v_u_22
+      		v_u_16.BackgroundColor3 = v_u_22 and v_u_26 or v_u_27
+      		v_u_11.Visible = not v_u_22
+      	end
+      end)
+      if v_u_18 then
+      	v_u_18.Visible = false
+      	v_u_18.Activated:Connect(function()
+      		-- upvalues: (ref) v_u_24, (copy) v_u_20, (copy) v_u_21
+      		if v_u_24 then
+      			print("DEBUG: Resetting button positions to default.")
+      			for _, v46 in ipairs(v_u_20) do
+      				local v47 = v_u_21[v46.Name]
+      				if v46 and v47 then
+      					v46:TweenPosition(UDim2.new(v47.ScaleX, v47.OffsetX, v47.ScaleY, v47.OffsetY), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+      				end
+      			end
+      		end
+      	end)
+      end
+      if v_u_19 then
+      	v_u_19.Visible = false
+      	v_u_19.Activated:Connect(function()
+      		-- upvalues: (ref) v_u_24, (copy) v_u_20, (copy) v_u_8, (copy) v_u_19, (copy) v_u_26, (copy) v_u_7
+      		if v_u_24 then
+      			print("DEBUG: Saving mobile button positions.")
+      			local v48 = {}
+      			for _, v49 in ipairs(v_u_20) do
+      				if v49 then
+      					local v50 = v49.Position
+      					v48[v49.Name] = {
+      						["ScaleX"] = v50.X.Scale,
+      						["OffsetX"] = v50.X.Offset,
+      						["ScaleY"] = v50.Y.Scale,
+      						["OffsetY"] = v50.Y.Offset
+      					}
+      				end
+      			end
+      			v_u_8:FireServer("MoblieLayout", v48)
+      			v_u_19.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+      			task.wait(0.5)
+      			v_u_19.BackgroundColor3 = v_u_26
+      			v_u_7.Fire("MoblieLayoutPos")
+      		end
+      	end)
+      end
+      v_u_7.Connect("AimStateChanged", function(p51)
+      	-- upvalues: (ref) v_u_23, (copy) v_u_11, (copy) v_u_25, (copy) v_u_26, (copy) v_u_7
+      	v_u_23 = p51
+      	v_u_11.BackgroundColor3 = v_u_23 and v_u_25 or v_u_26
+      	if p51 == false then
+      		v_u_7.Fire("AimWeapon", Enum.UserInputState.End)
+      	end
+      end)
+      v_u_7.Connect("MoblieLayoutPos", function(_)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_4, (copy) v_u_20, (copy) v_u_15, (copy) v_u_18, (copy) v_u_19, (ref) v_u_22, (copy) v_u_11, (copy) v_u_1
+      	v_u_24 = not v_u_24
+      	v_u_4.Out.BackgroundTransparency = v_u_24 and 0.5 or 1
+      	for _, v52 in ipairs(v_u_20) do
+      		if v52 then
+      			v52.Draggable = v_u_24
+      			v52.Active = v_u_24
+      		end
+      	end
+      	v_u_15.Active = v_u_24
+      	if v_u_18 then
+      		v_u_18.Visible = v_u_24
+      	end
+      	if v_u_19 then
+      		v_u_19.Visible = v_u_24
+      	end
+      	if v_u_22 then
+      		v_u_11.Visible = v_u_24
+      	end
+      	if v_u_24 then
+      		if not v_u_4.Enabled then
+      			v_u_4.Enabled = true
+      			return
+      		end
+      	else
+      		local v53 = v_u_1:GetLastInputType()
+      		local v54 = isInPlay
+      		if v54 then
+      			v54 = v53 == Enum.UserInputType.Touch
+      		end
+      		if v_u_4.Enabled ~= v54 then
+      			v_u_4.Enabled = v54
+      		end
+      	end
+      end)
+      if v17 then
+      	v17.BackgroundColor3 = v_u_26
+      end
+      v_u_7.Connect("PlayerInLobby", function()
+      	-- upvalues: (ref) v_u_24, (copy) v_u_4, (copy) v_u_1
+      	isInPlay = false
+      	if v_u_24 then
+      		if not v_u_4.Enabled then
+      			v_u_4.Enabled = true
+      			return
+      		end
+      	else
+      		local v55 = v_u_1:GetLastInputType()
+      		local v56 = isInPlay
+      		if v56 then
+      			v56 = v55 == Enum.UserInputType.Touch
+      		end
+      		if v_u_4.Enabled ~= v56 then
+      			v_u_4.Enabled = v56
+      		end
+      	end
+      end)
+      v_u_7.Connect("PlayerInPlay", function()
+      	-- upvalues: (ref) v_u_24, (copy) v_u_4, (copy) v_u_1, (copy) v_u_7
+      	isInPlay = true
+      	if v_u_24 then
+      		if not v_u_4.Enabled then
+      			v_u_4.Enabled = true
+      		end
+      	else
+      		local v57 = v_u_1:GetLastInputType()
+      		local v58 = isInPlay
+      		if v58 then
+      			v58 = v57 == Enum.UserInputType.Touch
+      		end
+      		if v_u_4.Enabled ~= v58 then
+      			v_u_4.Enabled = v58
+      		end
+      	end
+      	if v_u_24 then
+      		v_u_7.Fire("MoblieLayoutPos")
+      	end
+      end)
+      v_u_1.LastInputTypeChanged:Connect(function(_)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_4, (copy) v_u_1
+      	if v_u_24 then
+      		if not v_u_4.Enabled then
+      			v_u_4.Enabled = true
+      			return
+      		end
+      	else
+      		local v59 = v_u_1:GetLastInputType()
+      		local v60 = isInPlay
+      		if v60 then
+      			v60 = v59 == Enum.UserInputType.Touch
+      		end
+      		if v_u_4.Enabled ~= v60 then
+      			v_u_4.Enabled = v60
+      		end
+      	end
+      end)
+      v_u_6.DataUpdated.Event:Connect(function(p61, p62)
+      	-- upvalues: (copy) v_u_36, (copy) v_u_21, (copy) v_u_6
+      	if p61[1] == "Sett" and p61[2] == "MoblieLayout" then
+      		if p62 then
+      			print("DEBUG: DataUpdated: Applying new MoblieLayout.")
+      			v_u_36(p62)
+      		else
+      			print("DEBUG: DataUpdated: MoblieLayout reset, applying default.")
+      			v_u_36(v_u_21)
+      		end
+      	else
+      		if (p61[1] == "*" or p61[1] == "Sett") and not p61[2] then
+      			if v_u_6.Sett and v_u_6.Sett.MoblieLayout then
+      				print("DEBUG: DataUpdated: Full refresh, applying saved layout.")
+      				v_u_36(v_u_6.Sett.MoblieLayout)
+      				return
+      			end
+      			print("DEBUG: DataUpdated: Full refresh, applying default layout.")
+      			v_u_36(v_u_21)
+      		end
+      		return
+      	end
+      end)
+      v_u_1.TouchEnded:Connect(function(p63, _) -- name: onFireTouchEnded
+      	-- upvalues: (ref) v_u_30, (copy) v_u_7, (ref) v_u_22, (copy) v_u_10, (copy) v_u_26
+      	if p63 == v_u_30 then
+      		print("DEBUG: Firing weapon on touch release.")
+      		v_u_7.Fire("FireWeaponMoblie", Enum.UserInputState.Begin)
+      		if v_u_22 then
+      			v_u_7.Fire("AimWeapon", Enum.UserInputState.End)
+      		end
+      		v_u_10.BackgroundColor3 = v_u_26
+      		v_u_30 = nil
+      	end
+      end)
+      v_u_4.Enabled = false
+      if v_u_24 then
+      	if not v_u_4.Enabled then
+      		v_u_4.Enabled = true
+      	end
+      else
+      	local v64 = v_u_1:GetLastInputType()
+      	local v65 = isInPlay
+      	if v65 then
+      		v65 = v64 == Enum.UserInputType.Touch
+      	end
+      	if v_u_4.Enabled ~= v65 then
+      		v_u_4.Enabled = v65
+      	end
+      end
+    ------------------------------
+  📂 [LocalScript] New
+    📜 КОД СКРИПТА:
+      local v_u_1 = game:GetService("UserInputService")
+      local v2 = game:GetService("ReplicatedStorage")
+      local v3 = game:GetService("Players")
+      local v_u_4 = script:FindFirstAncestorOfClass("ScreenGui")
+      local v5 = v3.LocalPlayer:WaitForChild("PlayerScripts")
+      local v_u_6 = require(v5:WaitForChild("Data"))
+      local v_u_7 = require(v2:WaitForChild("SignalManager"))
+      v2:WaitForChild("Remotes"):WaitForChild("Command")
+      local v_u_8 = v2.Remotes:WaitForChild("UpdateSetting")
+      local v9 = v_u_4:FindFirstChild("Lobby", true)
+      local v_u_10 = v_u_4:FindFirstChild("FireButton", true)
+      local v_u_11 = v_u_4:FindFirstChild("AimButton", true)
+      local v12 = v_u_4:FindFirstChild("Swap", true)
+      local v13 = v_u_4:FindFirstChild("ReloadButton", true)
+      local v14 = v_u_4:FindFirstChild("Inspect", true)
+      local v_u_15 = v_u_4:FindFirstChild("Out", true)
+      local v_u_16 = script.Parent.HoldAim
+      local v17 = v_u_4:FindFirstChild("Pos", true)
+      local v_u_18 = v_u_4:FindFirstChild("resetPos", true)
+      local v_u_19 = v_u_4:FindFirstChild("SavePos", true)
+      local v_u_20 = {
+      	v9,
+      	v_u_10,
+      	v_u_11,
+      	v12,
+      	v13,
+      	v14
+      }
+      local v_u_21 = {
+      	["Lobby"] = {
+      		["ScaleX"] = 0.02,
+      		["OffsetX"] = 0,
+      		["ScaleY"] = 0.02,
+      		["OffsetY"] = 0
+      	},
+      	["FireButton"] = {
+      		["ScaleX"] = 0.261,
+      		["OffsetX"] = 0,
+      		["ScaleY"] = 0.639,
+      		["OffsetY"] = 0
+      	},
+      	["AimButton"] = {
+      		["ScaleX"] = 0.26,
+      		["OffsetX"] = 0,
+      		["ScaleY"] = 0.342,
+      		["OffsetY"] = 0
+      	},
+      	["Swap"] = {
+      		["ScaleX"] = 0.66,
+      		["OffsetX"] = 0,
+      		["ScaleY"] = 0.461,
+      		["OffsetY"] = 0
+      	},
+      	["ReloadButton"] = {
+      		["ScaleX"] = 0.664,
+      		["OffsetX"] = 0,
+      		["ScaleY"] = 0.532,
+      		["OffsetY"] = 0
+      	},
+      	["Inspect"] = {
+      		["ScaleX"] = 0.659,
+      		["OffsetX"] = 0,
+      		["ScaleY"] = 0.32,
+      		["OffsetY"] = 0
+      	}
+      }
+      local v_u_22 = true
+      local v_u_23 = false
+      local v_u_24 = false
+      local v_u_25 = Color3.fromRGB(91, 91, 91)
+      local v_u_26 = Color3.fromRGB(27, 27, 27)
+      local v_u_27 = Color3.new(0.231373, 0.564706, 0.156863)
+      local v_u_28 = false
+      local v_u_29 = {}
+      local function v_u_35(p30) -- name: applyLayout
+      	-- upvalues: (copy) v_u_21, (copy) v_u_20
+      	if type(p30) ~= "table" then
+      		print("ERROR: Invalid layout data, applying default.")
+      		p30 = v_u_21
+      	end
+      	print("DEBUG: Applying mobile layout.")
+      	for _, v31 in ipairs(v_u_20) do
+      		if v31 then
+      			local v32 = p30[v31.Name]
+      			if not v32 then
+      				::l7::
+      				v32 = v_u_21[v31.Name]
+      				goto l8
+      			end
+      			local v33 = v32.ScaleX
+      			if type(v33) == "nil" then
+      				goto l7
+      			end
+      			::l8::
+      			if v32 then
+      				local v34 = v32.ScaleX
+      				if type(v34) == "nil" then
+      					goto l10
+      				end
+      				v31.Position = UDim2.new(v32.ScaleX, v32.OffsetX, v32.ScaleY, v32.OffsetY)
+      			else
+      				::l10::
+      				warn("No layout data found for button: " .. v31.Name)
+      			end
+      		end
+      	end
+      end
+      local v_u_36 = false
+      task.wait()
+      if v_u_6.Sett and v_u_6.Sett.MoblieLayout then
+      	print("DEBUG: Loading SAVED mobile layout.")
+      	v_u_35(v_u_6.Sett.MoblieLayout)
+      else
+      	print("DEBUG: No saved layout found. Applying DEFAULT layout.")
+      	v_u_35(v_u_21)
+      end
+      v_u_15.InputBegan:Connect(function(p37, p38)
+      	-- upvalues: (ref) v_u_24, (ref) v_u_28, (copy) v_u_29
+      	if p37.UserInputType == Enum.UserInputType.Touch and not p38 then
+      		if v_u_24 then
+      			return
+      		end
+      		v_u_28 = true
+      		v_u_29[p37] = true
+      	end
+      end)
+      local v_u_39 = false
+      v_u_15.InputEnded:Connect(function(p40, p41)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_10, (copy) v_u_26, (ref) v_u_39, (copy) v_u_7, (ref) v_u_22, (ref) v_u_28, (copy) v_u_29
+      	if p40.UserInputType == Enum.UserInputType.Touch and not p41 then
+      		if v_u_24 then
+      			return
+      		end
+      		v_u_10.BackgroundColor3 = v_u_26
+      		if v_u_39 == true then
+      			v_u_39 = false
+      			v_u_7.Fire("FireWeaponMoblie", Enum.UserInputState.Begin)
+      			if v_u_22 then
+      				v_u_7.Fire("AimWeapon", Enum.UserInputState.End)
+      			end
+      		end
+      		v_u_28 = false
+      		v_u_29[p40] = nil
+      	end
+      end)
+      v_u_10.InputBegan:Connect(function(p42)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_29, (ref) v_u_39, (copy) v_u_7, (copy) v_u_10, (copy) v_u_25, (ref) v_u_22
+      	if p42.UserInputType == Enum.UserInputType.Touch then
+      		if v_u_24 then
+      			return
+      		end
+      		if v_u_29[p42] then
+      			return
+      		end
+      		v_u_39 = true
+      		v_u_7.Fire("FireWeaponMoblie", Enum.UserInputState.End)
+      		v_u_10.BackgroundColor3 = v_u_25
+      		if v_u_22 and v_u_39 == true then
+      			v_u_7.Fire("AimWeapon", Enum.UserInputState.Begin)
+      		end
+      	end
+      end)
+      v13.InputBegan:Connect(function(p43)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_29, (copy) v_u_7
+      	if p43.UserInputType == Enum.UserInputType.Touch then
+      		if v_u_24 then
+      			return
+      		end
+      		if v_u_29[p43] then
+      			return
+      		end
+      		v_u_7.Fire("ReloadWeapon")
+      	end
+      end)
+      v_u_11.InputBegan:Connect(function(p44)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_29, (ref) v_u_23, (ref) v_u_22, (copy) v_u_7
+      	if p44.UserInputType == Enum.UserInputType.Touch then
+      		if v_u_24 then
+      			return
+      		end
+      		if v_u_29[p44] then
+      			return
+      		end
+      		if v_u_23 and not v_u_22 then
+      			v_u_7.Fire("AimWeapon", Enum.UserInputState.End)
+      			return
+      		end
+      		v_u_7.Fire("AimWeapon", Enum.UserInputState.Begin)
+      	end
+      end)
+      v12.InputBegan:Connect(function(p45)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_29, (copy) v_u_7
+      	if p45.UserInputType == Enum.UserInputType.Touch then
+      		if v_u_24 then
+      			return
+      		end
+      		if v_u_29[p45] then
+      			return
+      		end
+      		v_u_7.Fire("SwapWeapon")
+      	end
+      end)
+      v14.InputBegan:Connect(function(p46)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_29, (copy) v_u_7
+      	if p46.UserInputType == Enum.UserInputType.Touch then
+      		if v_u_24 then
+      			return
+      		end
+      		if v_u_29[p46] then
+      			return
+      		end
+      		v_u_7.Fire("InspectWeapon")
+      	end
+      end)
+      v9.Activated:Connect(function()
+      	-- upvalues: (ref) v_u_24, (copy) v_u_7
+      	if not v_u_24 then
+      		v_u_7.Fire("Lobby", Enum.UserInputState.Begin)
+      	end
+      end)
+      v_u_16.Activated:Connect(function()
+      	-- upvalues: (ref) v_u_24, (ref) v_u_22, (copy) v_u_16, (copy) v_u_26, (copy) v_u_27, (copy) v_u_11
+      	if not v_u_24 then
+      		v_u_22 = not v_u_22
+      		v_u_16.BackgroundColor3 = v_u_22 and v_u_26 or v_u_27
+      		v_u_11.Visible = not v_u_22
+      	end
+      end)
+      if v_u_18 then
+      	v_u_18.Visible = false
+      	v_u_18.Activated:Connect(function()
+      		-- upvalues: (ref) v_u_24, (copy) v_u_20, (copy) v_u_21
+      		if v_u_24 then
+      			print("DEBUG: Resetting button positions to default.")
+      			for _, v47 in ipairs(v_u_20) do
+      				local v48 = v_u_21[v47.Name]
+      				if v47 and v48 then
+      					v47:TweenPosition(UDim2.new(v48.ScaleX, v48.OffsetX, v48.ScaleY, v48.OffsetY), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+      				end
+      			end
+      		end
+      	end)
+      end
+      if v_u_19 then
+      	v_u_19.Visible = false
+      	v_u_19.Activated:Connect(function()
+      		-- upvalues: (ref) v_u_24, (copy) v_u_20, (copy) v_u_8, (copy) v_u_19, (copy) v_u_26, (copy) v_u_7
+      		if v_u_24 then
+      			print("DEBUG: Saving mobile button positions.")
+      			local v49 = {}
+      			for _, v50 in ipairs(v_u_20) do
+      				if v50 then
+      					local v51 = v50.Position
+      					v49[v50.Name] = {
+      						["ScaleX"] = v51.X.Scale,
+      						["OffsetX"] = v51.X.Offset,
+      						["ScaleY"] = v51.Y.Scale,
+      						["OffsetY"] = v51.Y.Offset
+      					}
+      				end
+      			end
+      			v_u_8:FireServer("MoblieLayout", v49)
+      			v_u_19.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+      			task.wait(0.5)
+      			v_u_19.BackgroundColor3 = v_u_26
+      			v_u_7.Fire("MoblieLayoutPos")
+      		end
+      	end)
+      end
+      v_u_7.Connect("AimStateChanged", function(p52)
+      	-- upvalues: (ref) v_u_23, (copy) v_u_11, (copy) v_u_25, (copy) v_u_26, (copy) v_u_7
+      	v_u_23 = p52
+      	v_u_11.BackgroundColor3 = v_u_23 and v_u_25 or v_u_26
+      	if p52 == false then
+      		v_u_7.Fire("AimWeapon", Enum.UserInputState.End)
+      	end
+      end)
+      v_u_7.Connect("MoblieLayoutPos", function(_)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_4, (copy) v_u_20, (copy) v_u_15, (copy) v_u_18, (copy) v_u_19, (ref) v_u_22, (copy) v_u_11, (copy) v_u_1, (ref) v_u_36
+      	v_u_24 = not v_u_24
+      	v_u_4.Out.BackgroundTransparency = v_u_24 and 0.5 or 1
+      	for _, v53 in ipairs(v_u_20) do
+      		if v53 then
+      			v53.Draggable = v_u_24
+      			v53.Active = v_u_24
+      		end
+      	end
+      	v_u_15.Active = v_u_24
+      	if v_u_18 then
+      		v_u_18.Visible = v_u_24
+      	end
+      	if v_u_19 then
+      		v_u_19.Visible = v_u_24
+      	end
+      	if v_u_22 then
+      		v_u_11.Visible = v_u_24
+      	end
+      	if v_u_24 then
+      		if not v_u_4.Enabled then
+      			v_u_4.Enabled = true
+      			return
+      		end
+      	else
+      		local v54 = v_u_1:GetLastInputType()
+      		local v55 = v_u_36
+      		if v55 then
+      			v55 = v54 == Enum.UserInputType.Touch
+      		end
+      		if v_u_4.Enabled ~= v55 then
+      			v_u_4.Enabled = v55
+      		end
+      	end
+      end)
+      if v17 then
+      	v17.BackgroundColor3 = v_u_26
+      end
+      v_u_7.Connect("PlayerInLobby", function()
+      	-- upvalues: (ref) v_u_36, (ref) v_u_24, (copy) v_u_4, (copy) v_u_1
+      	v_u_36 = false
+      	if v_u_24 then
+      		if not v_u_4.Enabled then
+      			v_u_4.Enabled = true
+      			return
+      		end
+      	else
+      		local v56 = v_u_1:GetLastInputType()
+      		local v57 = v_u_36
+      		if v57 then
+      			v57 = v56 == Enum.UserInputType.Touch
+      		end
+      		if v_u_4.Enabled ~= v57 then
+      			v_u_4.Enabled = v57
+      		end
+      	end
+      end)
+      v_u_7.Connect("PlayerInPlay", function()
+      	-- upvalues: (ref) v_u_36, (ref) v_u_24, (copy) v_u_4, (copy) v_u_1, (copy) v_u_7
+      	v_u_36 = true
+      	if v_u_24 then
+      		if not v_u_4.Enabled then
+      			v_u_4.Enabled = true
+      		end
+      	else
+      		local v58 = v_u_1:GetLastInputType()
+      		local v59 = v_u_36
+      		if v59 then
+      			v59 = v58 == Enum.UserInputType.Touch
+      		end
+      		if v_u_4.Enabled ~= v59 then
+      			v_u_4.Enabled = v59
+      		end
+      	end
+      	if v_u_24 then
+      		v_u_7.Fire("MoblieLayoutPos")
+      	end
+      end)
+      v_u_1.LastInputTypeChanged:Connect(function(_)
+      	-- upvalues: (ref) v_u_24, (copy) v_u_4, (copy) v_u_1, (ref) v_u_36
+      	if v_u_24 then
+      		if not v_u_4.Enabled then
+      			v_u_4.Enabled = true
+      			return
+      		end
+      	else
+      		local v60 = v_u_1:GetLastInputType()
+      		local v61 = v_u_36
+      		if v61 then
+      			v61 = v60 == Enum.UserInputType.Touch
+      		end
+      		if v_u_4.Enabled ~= v61 then
+      			v_u_4.Enabled = v61
+      		end
+      	end
+      end)
+      v_u_6.DataUpdated.Event:Connect(function(p62, p63)
+      	-- upvalues: (copy) v_u_35, (copy) v_u_21, (copy) v_u_6
+      	if p62[1] == "Sett" and p62[2] == "MoblieLayout" then
+      		if p63 then
+      			print("DEBUG: DataUpdated: Applying new MoblieLayout.")
+      			v_u_35(p63)
+      		else
+      			print("DEBUG: DataUpdated: MoblieLayout reset, applying default.")
+      			v_u_35(v_u_21)
+      		end
+      	else
+      		if (p62[1] == "*" or p62[1] == "Sett") and not p62[2] then
+      			if v_u_6.Sett and v_u_6.Sett.MoblieLayout then
+      				print("DEBUG: DataUpdated: Full refresh, applying saved layout.")
+      				v_u_35(v_u_6.Sett.MoblieLayout)
+      				return
+      			end
+      			print("DEBUG: DataUpdated: Full refresh, applying default layout.")
+      			v_u_35(v_u_21)
+      		end
+      		return
+      	end
+      end)
+      v_u_4.Enabled = false
+      if v_u_24 then
+      	if not v_u_4.Enabled then
+      		v_u_4.Enabled = true
+      	end
+      else
+      	local v64 = v_u_1:GetLastInputType()
+      	local v65 = v_u_36
+      	if v65 then
+      		v65 = v64 == Enum.UserInputType.Touch
+      	end
+      	if v_u_4.Enabled ~= v65 then
+      		v_u_4.Enabled = v65
+      	end
+      end
+    ------------------------------
+  📂 [ImageButton] Lobby
+    📂 [UICorner] UICorner
+    📂 [UIAspectRatioConstraint] UIAspectRatioConstraint
+  📂 [Frame] Frame
+    📂 [UIAspectRatioConstraint] UIAspectRatioConstraint
+    📂 [ImageButton] AimButton
+      📂 [UICorner] UICorner
+      📂 [UIAspectRatioConstraint] UIAspectRatioConstraint
+      📂 [UIStroke] UIStroke
+    📂 [ImageButton] FireButton
+      📂 [UICorner] UICorner
+      📂 [UIAspectRatioConstraint] UIAspectRatioConstraint
+      📂 [UIStroke] UIStroke
+    📂 [ImageButton] ReloadButton
+      📂 [UICorner] UICorner
+      📂 [UIAspectRatioConstraint] UIAspectRatioConstraint
+      📂 [UIStroke] UIStroke
+    📂 [ImageButton] Swap
+      📂 [UICorner] UICorner
+      📂 [UIAspectRatioConstraint] UIAspectRatioConstraint
+      📂 [UIStroke] UIStroke
+    📂 [ImageButton] Inspect
+      📂 [UICorner] UICorner
+      📂 [UIAspectRatioConstraint] UIAspectRatioConstraint
+      📂 [UIStroke] UIStroke
+    📂 [ImageButton] Pos
+      📂 [UICorner] UICorner
+      📂 [UIAspectRatioConstraint] UIAspectRatioConstraint
+      📂 [UIStroke] UIStroke
+  📂 [ImageButton] Out
+  📂 [TextButton] HoldAim
+    📂 [UICorner] UICorner
+    📂 [UIStroke] UIStroke
+    📂 [UIAspectRatioConstraint] UIAspectRatioConstraint
+  📂 [TextButton] SavePos
+    📂 [UICorner] UICorner
+    📂 [UIStroke] UIStroke
+    📂 [UIAspectRatioConstraint] UIAspectRatioConstraint
+  📂 [TextButton] resetPos
+    📂 [UICorner] UICorner
+    📂 [UIStroke] UIStroke
+    📂 [UIAspectRatioConstraint] UIAspectRatioConstraint

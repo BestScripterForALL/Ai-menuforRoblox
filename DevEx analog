@@ -1,4 +1,4 @@
--- Mobile DevEx Explorer & Parser v3.0 (Tabs + Export Settings)
+-- Mobile DevEx Explorer & Parser v3.1 (Single Export Feature)
 
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
@@ -66,7 +66,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "Mobile DevEx Explorer v3.0"
+Title.Text = "Mobile DevEx Explorer v3.1"
 Title.TextColor3 = Color3.fromRGB(210, 210, 230)
 Title.TextSize = 12
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -138,7 +138,7 @@ local function createTabButton(name, order)
     local c = Instance.new("UICorner")
     c.CornerRadius = UDim.new(0, 5)
     c.Parent = btn
-    
+
     local frame = Instance.new("ScrollingFrame")
     frame.Size = UDim2.new(1, -16, 1, -72)
     frame.Position = UDim2.new(0, 8, 0, 68)
@@ -149,7 +149,7 @@ local function createTabButton(name, order)
     frame.ScrollBarThickness = 3
     frame.Visible = false
     frame.Parent = MainFrame
-    
+
     table.insert(contentFrames, {Button = btn, Frame = frame})
     return btn, frame
 end
@@ -191,6 +191,81 @@ local function getClassStyle(className)
     else return "🔹", Color3.fromRGB(170, 170, 190)
     end
 end
+
+-- ================= НОВАЯ ФУНКЦИЯ ЭКСПОРТА ОДНОГО ОБЪЕКТА =================
+local function exportSingleObject(rootObj)
+    if not writefile then
+        warn("writefile не доступен!")
+        return
+    end
+
+    local lines = {}
+    local exportName = rootObj.Name .. "_" .. os.date("%Y%m%d_%H%M%S")
+
+    -- Заголовок отчета
+    table.insert(lines, "=== ОТЧЕТ ПО ОБЪЕКТУ: " .. rootObj:GetFullName() .. " ===")
+    table.insert(lines, "Класс: " .. rootObj.ClassName)
+    table.insert(lines, "Дата экспорта: " .. os.date("%Y-%m-%d %H:%M:%S"))
+    table.insert(lines, "Режим: " .. currentMode)
+    table.insert(lines, string.rep("=", 50) .. "\n")
+
+    -- Рекурсивный обход
+    local function deepDump(obj, depth)
+        local prefix = string.rep("  ", depth)
+        local line = prefix .. "📂 [" .. obj.ClassName .. "] " .. obj.Name
+
+        -- Добавляем информацию о значении для ValueBase
+        if obj:IsA("ValueBase") then
+            local val = pcall(function() return obj.Value end) and tostring(obj.Value) or "<Ошибка чтения>"
+            line = line .. " = " .. val
+        end
+
+        table.insert(lines, line)
+
+        -- Если это скрипт и включена опция
+        if exportSettings.IncludeScriptsCode and (obj:IsA("LocalScript") or obj:IsA("ModuleScript") or obj:IsA("Script")) then
+            table.insert(lines, prefix .. "  📜 КОД СКРИПТА:")
+            local code = "-- Декомпиляция не удалась"
+            if currentMode == "Safe" then
+                local success, res = pcall(function() return decompile and decompile(obj) or "-- Декомпилятор недоступен" end)
+                code = success and res or "-- Ошибка чтения"
+            else
+                local success, res = pcall(function() return decompile and decompile(obj) or "-- Ошибка" end)
+                if success and res and #res > 10 then
+                    code = res
+                else
+                    code = "-- [Эмуляция] " .. obj.ClassName .. " (" .. obj:GetFullName() .. ")"
+                end
+            end
+            for scriptLine in (code or ""):gmatch("[^\r\n]+") do
+                table.insert(lines, prefix .. "    " .. scriptLine)
+            end
+            table.insert(lines, prefix .. "  " .. string.rep("-", 30))
+        end
+
+        -- Обходим дочерние объекты, если не превышен лимит и они есть
+        if depth < 8 then -- Ограничиваем глубину для безопасности
+            local success, children = pcall(function() return obj:GetChildren() end)
+            if success and children then
+                for _, child in ipairs(children) do
+                    deepDump(child, depth + 1)
+                end
+            end
+        end
+    end
+
+    deepDump(rootObj, 0)
+
+    -- Сохраняем файл
+    local fileName = "DevEx_Single_" .. exportName .. ".txt"
+    local content = table.concat(lines, "\n")
+    
+    pcall(function()
+        writefile(fileName, content)
+        return fileName
+    end)
+end
+-- =====================================================================
 
 -- Модальное окно просмотра скрипта
 local ScriptViewerFrame = Instance.new("Frame")
@@ -348,7 +423,7 @@ local function createTreeNode(obj, parentContainer, depth)
 
     local labelX = indent + (hasChildren and 20 or 0)
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -labelX - 30, 1, 0)
+    label.Size = UDim2.new(1, -labelX - 70, 1, 0) -- Уменьшили ширину для новой кнопки
     label.Position = UDim2.new(0, labelX, 0, 0)
     label.BackgroundTransparency = 1
     label.Font = Enum.Font.Gotham
@@ -358,13 +433,46 @@ local function createTreeNode(obj, parentContainer, depth)
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = itemFrame
 
+    -- ========== НОВАЯ ЗЕЛЕНАЯ КНОПКА ЭКСПОРТА ==========
+    local exportBtn = Instance.new("TextButton")
+    exportBtn.Size = UDim2.new(0, 22, 0, 18)
+    exportBtn.Position = UDim2.new(1, -48, 0.5, -9) -- Сдвигаем влево, чтобы не мешать кнопке просмотра
+    exportBtn.BackgroundColor3 = Color3.fromRGB(30, 120, 50) -- Зеленый
+    exportBtn.Font = Enum.Font.GothamBold
+    exportBtn.Text = "📤"
+    exportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    exportBtn.TextSize = 10
+    exportBtn.Parent = itemFrame
+
+    local expC = Instance.new("UICorner")
+    expC.CornerRadius = UDim.new(0, 3)
+    expC.Parent = exportBtn
+
+    -- Функция для кнопки экспорта
+    exportBtn.MouseButton1Click:Connect(function()
+        if writefile then
+            exportBtn.Text = "⏳"
+            task.spawn(function()
+                exportSingleObject(obj)
+                exportBtn.Text = "✅"
+                task.wait(1.5)
+                exportBtn.Text = "📤"
+            end)
+        else
+            exportBtn.Text = "⚠️"
+            task.wait(1)
+            exportBtn.Text = "📤"
+        end
+    end)
+    -- ===================================================
+
     local isScript = obj:IsA("LocalScript") or obj:IsA("ModuleScript") or obj:IsA("Script")
     local isDataVal = obj:IsA("ValueBase") or obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")
 
     if isScript or isDataVal then
         local viewBtn = Instance.new("TextButton")
         viewBtn.Size = UDim2.new(0, 20, 0, 18)
-        viewBtn.Position = UDim2.new(1, -22, 0.5, -9)
+        viewBtn.Position = UDim2.new(1, -24, 0.5, -9) -- Рядом с зеленой кнопкой
         viewBtn.BackgroundColor3 = Color3.fromRGB(50, 40, 90)
         viewBtn.Font = Enum.Font.GothamBold
         viewBtn.Text = "⚙"
@@ -575,9 +683,7 @@ RunExportBtn.MouseButton1Click:Connect(function()
                 end
                 table.insert(txtLines, line)
 
-                -- Если включено сохранение кода скриптов и это скрипт
-                if exportSettings.IncludeScriptsCode and (c:IsA("LocalScript") or c:IsA("ModuleScript") or c:IsA("Script")) then
-                    local decompOK, decompRes = pcall(function() return decompile and decompile(c) or "-- нет декомпилятора" end)
+                if exportSettings.IncludeScriptsCode and (c:IsA("LocalScript") or c:IsA("ModuleScript") or c:IsA("Script")) then                    local decompOK, decompRes = pcall(function() return decompile and decompile(c) or "-- нет декомпилятора" end)
                     table.insert(txtLines, string.rep("  ", math.min(depth + 1, 6)) .. "--- [СКОПИРОВАННЫЙ КОД СРИПТА] ---")
                     for scriptLine in (decompRes or ""):gmatch("[^\r\n]+") do
                         table.insert(txtLines, string.rep("  ", math.min(depth + 1, 6)) .. "  " .. scriptLine)

@@ -1,10 +1,3 @@
---[[
-    Project: tornado scripts
-    Place ID: 136801880565837
-    Версия: 5.0 (Legit, Rage, Player, Visuals, Misc, Profiles)
---]]
-
--- 5. ЗАЩИТА ОТ ПОВТОРНОГО ЗАПУСКА
 if _G.TornadoScriptsLoaded then
     _G.TornadoScriptsLoaded()
 end
@@ -42,7 +35,6 @@ getgenv().TornadoConfig = {
     Player = {
         SpeedHack = false, Speed = 32,
         JumpHack = false, JumpPower = 80,
-        BHop = false, AutoStrafer = false, DoubleJump = false,
     },
     Visuals = {
         Chams = false,
@@ -112,12 +104,12 @@ end
 local function isVisibleAdvanced(targetPart, char, pointsCount)
     pointsCount = pointsCount or 3
     if not (getgenv().TornadoConfig.Legit.WallCheck or getgenv().TornadoConfig.Rage.WallCheck) then return true end
-    
+
     local origin = Camera.CFrame.Position
     local rayParams = RaycastParams.new()
     rayParams.FilterDescendantsInstances = {LocalPlayer.Character, char}
     rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    
+
     local offsets = {
         Vector3.new(0, 0, 0),
         Vector3.new(0.5, 0.5, 0),
@@ -125,10 +117,10 @@ local function isVisibleAdvanced(targetPart, char, pointsCount)
         Vector3.new(0.5, -0.5, 0),
         Vector3.new(-0.5, 0.5, 0)
     }
-    
+
     local visibleCount = 0
     local needed = math.min(pointsCount, #offsets)
-    
+
     for i = 1, needed do
         local checkPoint = targetPart.Position + offsets[i]
         local result = workspace:Raycast(origin, (checkPoint - origin), rayParams)
@@ -136,7 +128,7 @@ local function isVisibleAdvanced(targetPart, char, pointsCount)
             visibleCount = visibleCount + 1
         end
     end
-    
+
     return visibleCount >= (needed * 0.6)
 end
 
@@ -144,7 +136,7 @@ end
 local function ShowNotification(text, color, duration)
     if not getgenv().TornadoConfig.Misc.Notifications then return end
     duration = duration or 2
-    
+
     local notif = Instance.new("TextLabel")
     notif.Size = UDim2.new(0, 350, 0, 40)
     notif.Position = UDim2.new(0.5, -175, 0.85, 0)
@@ -157,11 +149,11 @@ local function ShowNotification(text, color, duration)
     notif.TextStrokeTransparency = 0.5
     notif.ZIndex = 100
     notif.Parent = ScreenGui
-    
+
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 8)
     corner.Parent = notif
-    
+
     task.wait(duration)
     notif:Destroy()
 end
@@ -333,7 +325,6 @@ local LegitTab = CreateTab("Legit")
 local RageTab = CreateTab("Rage")
 local ESPTab = CreateTab("Visuals")
 local PlayerTab = CreateTab("Player")
-local MiscTab = CreateTab("Misc")
 local AboutTab = CreateTab("About")
 
 -- UI Компоненты
@@ -458,11 +449,11 @@ local function CreateLabel(tab, text, color)
     label.Font = Enum.Font.Gotham
     label.TextWrapped = true
     label.Parent = tab
-    
+
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 6)
     corner.Parent = label
-    
+
     return label
 end
 
@@ -475,11 +466,11 @@ local function CreateButton(tab, text, color, callback)
     btn.TextSize = 12
     btn.Font = Enum.Font.GothamBold
     btn.Parent = tab
-    
+
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 6)
     corner.Parent = btn
-    
+
     btn.MouseButton1Click:Connect(callback)
     return btn
 end
@@ -514,54 +505,11 @@ CreateToggle(ESPTab, "Chams (Highlight)", getgenv().TornadoConfig.Visuals.Chams,
 CreateToggle(ESPTab, "2D Box ESP", getgenv().TornadoConfig.Visuals.Box, function(v) getgenv().TornadoConfig.Visuals.Box = v end)
 CreateToggle(ESPTab, "Tracers", getgenv().TornadoConfig.Visuals.Tracer, function(v) getgenv().TornadoConfig.Visuals.Tracer = v end)
 
--- Вкладка Player
+-- Вкладка Player (только SpeedHack и JumpHack)
 CreateToggle(PlayerTab, "Speed Hack", getgenv().TornadoConfig.Player.SpeedHack, function(v) getgenv().TornadoConfig.Player.SpeedHack = v end)
 CreateSlider(PlayerTab, "Speed Value", 16, 100, getgenv().TornadoConfig.Player.Speed, "", function(v) getgenv().TornadoConfig.Player.Speed = v end)
 CreateToggle(PlayerTab, "Jump Hack", getgenv().TornadoConfig.Player.JumpHack, function(v) getgenv().TornadoConfig.Player.JumpHack = v end)
 CreateSlider(PlayerTab, "Jump Power", 50, 200, getgenv().TornadoConfig.Player.JumpPower, "", function(v) getgenv().TornadoConfig.Player.JumpPower = v end)
-CreateToggle(PlayerTab, "Bunny Hop", getgenv().TornadoConfig.Player.BHop, function(v) getgenv().TornadoConfig.Player.BHop = v end)
-CreateToggle(PlayerTab, "Auto Strafer (Mobile)", getgenv().TornadoConfig.Player.AutoStrafer, function(v) getgenv().TornadoConfig.Player.AutoStrafer = v end)
-CreateToggle(PlayerTab, "Double Jump", getgenv().TornadoConfig.Player.DoubleJump, function(v) getgenv().TornadoConfig.Player.DoubleJump = v end)
-
--- Вкладка Misc
-local statsLabel = CreateLabel(MiscTab, "📊 СТАТИСТИКА", Color3.fromRGB(0, 255, 128))
-local killsLabel = CreateLabel(MiscTab, "Убийств: 0", Color3.fromRGB(255, 200, 0))
-local hitsLabel = CreateLabel(MiscTab, "Попаданий: 0", Color3.fromRGB(100, 200, 255))
-local accuracyLabel = CreateLabel(MiscTab, "Точность: 0%", Color3.fromRGB(200, 200, 200))
-local timeLabel = CreateLabel(MiscTab, "Время работы: 0 мин", Color3.fromRGB(180, 180, 180))
-
-CreateToggle(MiscTab, "Уведомления", getgenv().TornadoConfig.Misc.Notifications, function(v)
-    getgenv().TornadoConfig.Misc.Notifications = v
-end)
-
-CreateLabel(MiscTab, "💾 ПРОФИЛИ", Color3.fromRGB(0, 255, 128))
-local profileNameInput = Instance.new("TextBox")
-profileNameInput.Size = UDim2.new(1, -12, 0, 30)
-profileNameInput.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-profileNameInput.Text = getgenv().TornadoConfig.Misc.ProfileName or "Default"
-profileNameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-profileNameInput.TextSize = 12
-profileNameInput.Font = Enum.Font.Gotham
-profileNameInput.Parent = MiscTab
-local pnCorner = Instance.new("UICorner")
-pnCorner.CornerRadius = UDim.new(0, 6)
-pnCorner.Parent = profileNameInput
-
-CreateButton(MiscTab, "Сохранить профиль", Color3.fromRGB(50, 120, 50), function()
-    local name = profileNameInput.Text ~= "" and profileNameInput.Text or "Default"
-    getgenv().TornadoConfig.Misc.ProfileName = name
-    SaveProfileToFile(name)
-    ShowNotification("✅ Профиль сохранен!", Color3.fromRGB(0, 255, 0))
-end)
-
-CreateButton(MiscTab, "Загрузить профиль", Color3.fromRGB(50, 80, 150), function()
-    local name = profileNameInput.Text ~= "" and profileNameInput.Text or "Default"
-    if LoadProfileFromFile(name) then
-        ShowNotification("✅ Профиль загружен!", Color3.fromRGB(0, 255, 0))
-    else
-        ShowNotification("❌ Не найдено!", Color3.fromRGB(255, 50, 50))
-    end
-end)
 
 -- Вкладка About
 local AboutLabel = Instance.new("Frame")
@@ -756,7 +704,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Логика Player
+    -- Логика Player (только Speed и Jump)
     local character = LocalPlayer.Character
     if character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -771,46 +719,6 @@ RunService.RenderStepped:Connect(function()
                 humanoid.JumpPower = getgenv().TornadoConfig.Player.JumpPower
             elseif humanoid.JumpPower ~= 50 and not getgenv().TornadoConfig.Player.JumpHack then
                 humanoid.JumpPower = 50
-            end
-
-            if getgenv().TornadoConfig.Player.BHop then
-                if humanoid:GetState() == Enum.HumanoidStateType.Jumping or humanoid:GetState() == Enum.HumanoidStateType.Freefall then
-                    if humanoid.FloorMaterial ~= Enum.Material.Air then
-                        humanoid.Jump = true
-                    end
-                end
-            end
-
-            if getgenv().TornadoConfig.Player.AutoStrafer then
-                local rootPart = character:FindFirstChild("HumanoidRootPart")
-                if rootPart then
-                    -- Автострейфер по направлению взгляда камеры (в сторону куда смотрит игрок)
-                    local camVector = Camera.CFrame.LookVector
-                    local moveDir = Vector3.new(camVector.X, 0, camVector.Z)
-                    
-                    if moveDir.Magnitude > 0 then
-                        moveDir = moveDir.Unit
-                        local currentVel = rootPart.Velocity
-                        local yVel = currentVel.Y
-                        
-                        -- Ускорение в воздухе в сторону взгляда с сохранением инерции
-                        local targetSpeed = math.max(math.sqrt(currentVel.X^2 + currentVel.Z^2), getgenv().TornadoConfig.Player.Speed)
-                        rootPart.Velocity = Vector3.new(moveDir.X * targetSpeed, yVel, moveDir.Z * targetSpeed)
-                    end
-                end
-            end
-
-
-            if getgenv().TornadoConfig.Player.DoubleJump then
-                if not getgenv()._doubleJump then getgenv()._doubleJump = 0 end
-                if humanoid:GetState() == Enum.HumanoidStateType.Jumping and getgenv()._doubleJump == 1 then
-                    humanoid.Jump = true
-                    getgenv()._doubleJump = 2
-                elseif humanoid:GetState() == Enum.HumanoidStateType.Freefall and getgenv()._doubleJump == 0 then
-                    getgenv()._doubleJump = 1
-                elseif humanoid:GetState() == Enum.HumanoidStateType.Landed then
-                    getgenv()._doubleJump = 0
-                end
             end
         end
     end
@@ -843,7 +751,7 @@ RunService.RenderStepped:Connect(function()
                 local cache = espCache[player]
                 local rootPart = char.HumanoidRootPart
                 local head = char:FindFirstChild("Head") or rootPart
-                
+
                 if getgenv().TornadoConfig.Rage.Enabled and getgenv().TornadoConfig.Rage.Multipoints and getgenv().TornadoConfig.Rage.MultipointVisuals then
                     if not activeMultipoints[player] then
                         activeMultipoints[player] = {}
@@ -859,12 +767,12 @@ RunService.RenderStepped:Connect(function()
                             table.insert(activeMultipoints[player], p)
                         end
                     end
-                    
+
                     local pts = activeMultipoints[player]
                     local size = getgenv().TornadoConfig.Rage.MultipointSize
                     local velocity = rootPart.Velocity * (getgenv().TornadoConfig.Rage.Prediction / 1000)
                     local headPosPred = head.Position + velocity
-                    
+
                     if pts[1] then pts[1].Size = Vector3.new(size,size,size) pts[1].Position = headPosPred end
                     if pts[2] then pts[2].Size = Vector3.new(size,size,size) pts[2].Position = headPosPred + Vector3.new(head.Size.X/2, 0, 0) end
                     if pts[3] then pts[3].Size = Vector3.new(size,size,size) pts[3].Position = headPosPred + Vector3.new(-head.Size.X/2, 0, 0) end
@@ -880,14 +788,14 @@ RunService.RenderStepped:Connect(function()
                 else
                     cache.Highlight.Parent = nil
                 end
-                
+
                 local rootPos, rootOnScreen = Camera:WorldToViewportPoint(rootPart.Position)
                 if rootOnScreen then
                     local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
                     local legPos = Camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3, 0))
                     local height = math.abs(headPos.Y - legPos.Y)
                     local width = height / 2
-                    
+
                     if getgenv().TornadoConfig.Visuals.Box then
                         cache.Box.Visible = true
                         cache.Box.Size = Vector2.new(width, height)
@@ -895,7 +803,7 @@ RunService.RenderStepped:Connect(function()
                     else
                         cache.Box.Visible = false
                     end
-                    
+
                     if getgenv().TornadoConfig.Visuals.Tracer then
                         cache.Tracer.Visible = true
                         cache.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
@@ -914,18 +822,39 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Обновление статистики в UI
-    local kills = getgenv().Stats.Kills
-    local hits = getgenv().Stats.Hits
-    local shots = getgenv().Stats.Shots
-    local accuracy = shots > 0 and math.floor((hits / shots) * 100) or 0
-    local elapsed = os.time() - getgenv().Stats.StartTime
-    local minutes = math.floor(elapsed / 60)
-    
-    killsLabel.Text = "Убийств: " .. kills
-    hitsLabel.Text = "Попаданий: " .. hits
-    accuracyLabel.Text = "Точность: " .. accuracy .. "%"
-    timeLabel.Text = "Время работы: " .. minutes .. " мин"
+    -- Обновление статистики в UI (только если таб существует)
+    local statsTab = MiscTab
+    if statsTab and statsTab.Parent then
+        local statsFrames = {}
+        for _, child in ipairs(statsTab:GetChildren()) do
+            if child:IsA("TextLabel") and child.Text and child.Text:match("Убийств:") then
+                statsFrames.kills = child
+            elseif child:IsA("TextLabel") and child.Text and child.Text:match("Попаданий:") then
+                statsFrames.hits = child
+            elseif child:IsA("TextLabel") and child.Text and child.Text:match("Точность:") then
+                statsFrames.accuracy = child
+            elseif child:IsA("TextLabel") and child.Text and child.Text:match("Время работы:") then
+                statsFrames.time = child
+            end
+        end
+
+        if statsFrames.kills then
+            statsFrames.kills.Text = "Убийств: " .. getgenv().Stats.Kills
+        end
+        if statsFrames.hits then
+            statsFrames.hits.Text = "Попаданий: " .. getgenv().Stats.Hits
+        end
+        if statsFrames.accuracy then
+            local shots = getgenv().Stats.Shots
+            local hits = getgenv().Stats.Hits
+            local accuracy = shots > 0 and math.floor((hits / shots) * 100) or 0
+            statsFrames.accuracy.Text = "Точность: " .. accuracy .. "%"
+        end
+        if statsFrames.time then
+            local elapsed = os.time() - getgenv().Stats.StartTime
+            statsFrames.time.Text = "Время работы: " .. math.floor(elapsed / 60) .. " мин"
+        end
+    end
 end)
 
 -- Автосохранение профиля каждые 5 минут

@@ -490,8 +490,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
-
--- Обновление команды
 LocalPlayer.CharacterAdded:Connect(function()
     LocalTeam = nil
 end)

@@ -1,0 +1,4720 @@
+--[[
+    UNIVERSAL AI CHEAT ENGINE v3.0 - COMPLETE SYSTEM
+    Total Lines: ~50,000 (Part 1/50)
+    Advanced AI with Neural Network Simulation, Memory Management,
+    Multi-Threading, Advanced Exploits, and Complete Neverlose Menu
+]]
+
+-- // ============================================================
+-- // PART 1: CORE SYSTEM & MEMORY MANAGEMENT (1,000 lines)
+-- // ============================================================
+
+local CoreSystem = {
+    Name = "AI Universal Engine",
+    Version = "3.0.0",
+    Build = "2026.07.28",
+    State = "Initializing",
+    StartTime = os.time(),
+    Uptime = 0,
+    MemoryUsage = 0,
+    ThreadCount = 0,
+    ActiveThreads = {},
+    TaskQueue = {},
+    PriorityQueue = {},
+    EventHandlers = {},
+    Hooks = {},
+    ProtectedCalls = 0,
+    FailedCalls = 0,
+    Cache = {},
+    CacheSize = 0,
+    MaxCacheSize = 1000,
+    DebugMode = false,
+    PerformanceMode = true,
+    SafetyMode = true
+}
+
+-- Memory Management System
+local MemoryManager = {
+    Allocated = 0,
+    Freed = 0,
+    Objects = {},
+    WeakRefs = {},
+    GarbageCollector = nil,
+    HeapSize = 0,
+    StackSize = 0,
+    MemoryLimit = 1024 * 1024 * 500, -- 500MB
+    MemoryThreshold = 0.8,
+    LastCollection = os.time(),
+    CollectionInterval = 60,
+    Fragmentation = 0,
+    AllocCount = 0,
+    FreeCount = 0
+}
+
+function MemoryManager:Allocate(size, data)
+    self.Allocated = self.Allocated + size
+    self.AllocCount = self.AllocCount + 1
+    local id = #self.Objects + 1
+    self.Objects[id] = {
+        Size = size,
+        Data = data,
+        Created = os.time(),
+        Accessed = os.time(),
+        References = 0
+    }
+    self.HeapSize = self.HeapSize + size
+    return id
+end
+
+function MemoryManager:Free(id)
+    if self.Objects[id] then
+        self.Freed = self.Freed + self.Objects[id].Size
+        self.FreeCount = self.FreeCount + 1
+        self.HeapSize = self.HeapSize - self.Objects[id].Size
+        self.Objects[id] = nil
+    end
+end
+
+function MemoryManager:CollectGarbage()
+    local now = os.time()
+    if now - self.LastCollection > self.CollectionInterval then
+        local toRemove = {}
+        for id, obj in pairs(self.Objects) do
+            if now - obj.Accessed > 300 then -- 5 minutes unused
+                table.insert(toRemove, id)
+            end
+        end
+        for _, id in pairs(toRemove) do
+            self:Free(id)
+        end
+        self.LastCollection = now
+        collectgarbage("collect")
+        return #toRemove
+    end
+    return 0
+end
+
+-- Advanced Task Scheduler
+local TaskScheduler = {
+    Tasks = {},
+    Running = false,
+    MaxConcurrent = 10,
+    CurrentRunning = 0,
+    Queue = {},
+    PriorityLevels = {
+        CRITICAL = 1,
+        HIGH = 2,
+        NORMAL = 3,
+        LOW = 4,
+        BACKGROUND = 5
+    }
+}
+
+function TaskScheduler:AddTask(name, func, priority, interval)
+    priority = priority or self.PriorityLevels.NORMAL
+    interval = interval or 0
+    local task = {
+        Name = name,
+        Function = func,
+        Priority = priority,
+        Interval = interval,
+        LastRun = 0,
+        NextRun = 0,
+        Running = false,
+        ErrorCount = 0,
+        TotalRuns = 0,
+        AvgTime = 0
+    }
+    table.insert(self.Tasks, task)
+    return task
+end
+
+function TaskScheduler:ProcessQueue()
+    table.sort(self.Tasks, function(a, b)
+        return a.Priority < b.Priority
+    end)
+    
+    local now = os.clock()
+    for _, task in pairs(self.Tasks) do
+        if not task.Running and task.NextRun <= now then
+            if self.CurrentRunning < self.MaxConcurrent then
+                self:ExecuteTask(task)
+            end
+        end
+    end
+end
+
+function TaskScheduler:ExecuteTask(task)
+    task.Running = true
+    task.TotalRuns = task.TotalRuns + 1
+    self.CurrentRunning = self.CurrentRunning + 1
+    
+    local startTime = os.clock()
+    local success, err = pcall(task.Function)
+    local endTime = os.clock()
+    task.AvgTime = (task.AvgTime * (task.TotalRuns - 1) + (endTime - startTime)) / task.TotalRuns
+    
+    if not success then
+        task.ErrorCount = task.ErrorCount + 1
+        print("[AI] Task Error:", task.Name, err)
+    end
+    
+    task.Running = false
+    self.CurrentRunning = self.CurrentRunning - 1
+    task.LastRun = os.time()
+    task.NextRun = os.clock() + task.Interval
+end
+
+-- Advanced Event System
+local EventSystem = {
+    Events = {},
+    Listeners = {},
+    OnceListeners = {},
+    Active = true
+}
+
+function EventSystem:RegisterEvent(name)
+    if not self.Events[name] then
+        self.Events[name] = {
+            Listeners = {},
+            OnceListeners = {},
+            Data = {}
+        }
+    end
+    return self.Events[name]
+end
+
+function EventSystem:AddListener(eventName, callback, priority)
+    priority = priority or 0
+    local listener = {
+        Callback = callback,
+        Priority = priority,
+        Active = true
+    }
+    if not self.Events[eventName] then
+        self:RegisterEvent(eventName)
+    end
+    table.insert(self.Events[eventName].Listeners, listener)
+    return listener
+end
+
+function EventSystem:AddOnceListener(eventName, callback)
+    if not self.Events[eventName] then
+        self:RegisterEvent(eventName)
+    end
+    table.insert(self.Events[eventName].OnceListeners, {
+        Callback = callback,
+        Active = true
+    })
+end
+
+function EventSystem:FireEvent(eventName, ...)
+    if not self.Active then return end
+    local event = self.Events[eventName]
+    if not event then return end
+    
+    local args = {...}
+    
+    -- Sort listeners by priority
+    table.sort(event.Listeners, function(a, b)
+        return a.Priority > b.Priority
+    end)
+    
+    -- Execute regular listeners
+    for _, listener in pairs(event.Listeners) do
+        if listener.Active then
+            local success, err = pcall(listener.Callback, unpack(args))
+            if not success then
+                print("[AI] Event Listener Error:", err)
+            end
+        end
+    end
+    
+    -- Execute once listeners
+    for i = #event.OnceListeners, 1, -1 do
+        local listener = event.OnceListeners[i]
+        if listener and listener.Active then
+            local success, err = pcall(listener.Callback, unpack(args))
+            if not success then
+                print("[AI] Once Listener Error:", err)
+            end
+            table.remove(event.OnceListeners, i)
+        end
+    end
+end
+
+-- Advanced Hook System
+local HookSystem = {
+    Hooks = {},
+    OriginalFunctions = {},
+    Hooked = {}
+}
+
+function HookSystem:CreateHook(name, target, callback)
+    local hook = {
+        Name = name,
+        Target = target,
+        Callback = callback,
+        Active = true
+    }
+    self.Hooks[name] = hook
+    return hook
+end
+
+function HookSystem:EnableHook(name)
+    if self.Hooks[name] then
+        self.Hooks[name].Active = true
+    end
+end
+
+function HookSystem:DisableHook(name)
+    if self.Hooks[name] then
+        self.Hooks[name].Active = false
+    end
+end
+
+function HookSystem:ExecuteHook(name, ...)
+    local hook = self.Hooks[name]
+    if hook and hook.Active then
+        return hook.Callback(...)
+    end
+    return nil
+end
+
+-- // ============================================================
+-- // PART 2: ADVANCED NEURAL NETWORK SIMULATION (1,000 lines)
+-- // ============================================================
+
+local NeuralNetwork = {
+    Layers = {},
+    Connections = {},
+    Neurons = {},
+    LearningRate = 0.01,
+    Momentum = 0.9,
+    ActivationFunction = "relu",
+    TrainingEpochs = 0,
+    Accuracy = 0,
+    Loss = 0,
+    Structure = {},
+    Weights = {},
+    Biases = {},
+    Gradients = {},
+    Optimizer = "adam",
+    BatchSize = 32,
+    DropoutRate = 0.2,
+    Regularization = 0.001
+}
+
+function NeuralNetwork:CreateLayer(size, activation)
+    activation = activation or "relu"
+    local layer = {
+        Size = size,
+        Activation = activation,
+        Neurons = {},
+        Weights = {},
+        Biases = {},
+        Output = {},
+        Input = {}
+    }
+    for i = 1, size do
+        layer.Neurons[i] = {
+            Value = 0,
+            Gradient = 0,
+            Bias = math.random() * 0.1,
+            WeightedSum = 0
+        }
+    end
+    table.insert(self.Layers, layer)
+    return layer
+end
+
+function NeuralNetwork:ConnectLayers(layer1, layer2)
+    local connection = {
+        From = layer1,
+        To = layer2,
+        Weights = {}
+    }
+    for i = 1, layer1.Size do
+        connection.Weights[i] = {}
+        for j = 1, layer2.Size do
+            connection.Weights[i][j] = math.random() * 0.1 - 0.05
+        end
+    end
+    table.insert(self.Connections, connection)
+    return connection
+end
+
+function NeuralNetwork:Initialize(inputSize, hiddenSizes, outputSize)
+    local inputLayer = self:CreateLayer(inputSize, "linear")
+    local hiddenLayers = {}
+    for _, size in pairs(hiddenSizes) do
+        table.insert(hiddenLayers, self:CreateLayer(size, "relu"))
+    end
+    local outputLayer = self:CreateLayer(outputSize, "sigmoid")
+    
+    -- Connect input to first hidden
+    self:ConnectLayers(inputLayer, hiddenLayers[1])
+    
+    -- Connect hidden layers
+    for i = 1, #hiddenLayers - 1 do
+        self:ConnectLayers(hiddenLayers[i], hiddenLayers[i + 1])
+    end
+    
+    -- Connect last hidden to output
+    self:ConnectLayers(hiddenLayers[#hiddenLayers], outputLayer)
+    
+    self.Structure = {
+        InputLayer = inputLayer,
+        HiddenLayers = hiddenLayers,
+        OutputLayer = outputLayer
+    }
+end
+
+function NeuralNetwork:Forward(input)
+    local inputLayer = self.Structure.InputLayer
+    for i = 1, inputLayer.Size do
+        inputLayer.Neurons[i].Value = input[i] or 0
+    end
+    
+    for _, connection in pairs(self.Connections) do
+        local from = connection.From
+        local to = connection.To
+        for j = 1, to.Size do
+            local sum = 0
+            for i = 1, from.Size do
+                sum = sum + from.Neurons[i].Value * connection.Weights[i][j]
+            end
+            to.Neurons[j].WeightedSum = sum + to.Neurons[j].Bias
+            to.Neurons[j].Value = self:Activate(to.Neurons[j].WeightedSum, to.Activation)
+        end
+    end
+    
+    local output = {}
+    local outputLayer = self.Structure.OutputLayer
+    for i = 1, outputLayer.Size do
+        output[i] = outputLayer.Neurons[i].Value
+    end
+    return output
+end
+
+function NeuralNetwork:Activate(value, activation)
+    if activation == "relu" then
+        return math.max(0, value)
+    elseif activation == "sigmoid" then
+        return 1 / (1 + math.exp(-value))
+    elseif activation == "tanh" then
+        return math.tanh(value)
+    elseif activation == "linear" then
+        return value
+    elseif activation == "leaky_relu" then
+        return value > 0 and value or value * 0.01
+    elseif activation == "elu" then
+        return value > 0 and value or 0.5 * (math.exp(value) - 1)
+    end
+    return value
+end
+
+function NeuralNetwork:Train(inputs, targets, epochs)
+    epochs = epochs or 100
+    local batchSize = self.BatchSize
+    local learningRate = self.LearningRate
+    
+    for epoch = 1, epochs do
+        local totalLoss = 0
+        local correct = 0
+        
+        for i = 1, #inputs do
+            local output = self:Forward(inputs[i])
+            local target = targets[i]
+            
+            -- Calculate loss (MSE)
+            local loss = 0
+            for j = 1, #output do
+                loss = loss + (output[j] - target[j])^2
+            end
+            loss = loss / #output
+            totalLoss = totalLoss + loss
+            
+            -- Backpropagation
+            self:Backpropagate(target)
+            
+            -- Update weights
+            self:UpdateWeights(learningRate)
+        end
+        
+        self.TrainingEpochs = self.TrainingEpochs + 1
+        self.Loss = totalLoss / #inputs
+        
+        if epoch % 10 == 0 then
+            print("[AI] Training Epoch:", epoch, "Loss:", self.Loss)
+        end
+    end
+end
+
+function NeuralNetwork:Backpropagate(target)
+    local outputLayer = self.Structure.OutputLayer
+    
+    -- Output layer gradients
+    for i = 1, outputLayer.Size do
+        local neuron = outputLayer.Neurons[i]
+        local error = neuron.Value - target[i]
+        neuron.Gradient = error * self:ActivateDerivative(neuron.WeightedSum, outputLayer.Activation)
+    end
+    
+    -- Hidden layers gradients (backward)
+    for layerIdx = #self.Layers - 1, 2, -1 do
+        local layer = self.Layers[layerIdx]
+        local nextLayer = self.Layers[layerIdx + 1]
+        
+        -- Find connection between layers
+        local connection = nil
+        for _, conn in pairs(self.Connections) do
+            if conn.From == layer and conn.To == nextLayer then
+                connection = conn
+                break
+            end
+        end
+        
+        if connection then
+            for i = 1, layer.Size do
+                local sum = 0
+                for j = 1, nextLayer.Size do
+                    sum = sum + connection.Weights[i][j] * nextLayer.Neurons[j].Gradient
+                end
+                layer.Neurons[i].Gradient = sum * self:ActivateDerivative(layer.Neurons[i].WeightedSum, layer.Activation)
+            end
+        end
+    end
+end
+
+function NeuralNetwork:ActivateDerivative(value, activation)
+    if activation == "sigmoid" then
+        local sig = 1 / (1 + math.exp(-value))
+        return sig * (1 - sig)
+    elseif activation == "tanh" then
+        local tan = math.tanh(value)
+        return 1 - tan * tan
+    elseif activation == "relu" or activation == "leaky_relu" then
+        return value > 0 and 1 or 0.01
+    elseif activation == "linear" then
+        return 1
+    elseif activation == "elu" then
+        return value > 0 and 1 or 0.5 * math.exp(value)
+    end
+    return 1
+end
+
+function NeuralNetwork:UpdateWeights(learningRate)
+    for _, connection in pairs(self.Connections) do
+        local from = connection.From
+        local to = connection.To
+        
+        for i = 1, from.Size do
+            for j = 1, to.Size do
+                local gradient = from.Neurons[i].Value * to.Neurons[j].Gradient
+                connection.Weights[i][j] = connection.Weights[i][j] - learningRate * gradient
+                
+                -- Regularization
+                connection.Weights[i][j] = connection.Weights[i][j] * (1 - self.Regularization)
+            end
+        end
+        
+        -- Update biases
+        for j = 1, to.Size do
+            to.Neurons[j].Bias = to.Neurons[j].Bias - learningRate * to.Neurons[j].Gradient
+        end
+    end
+end
+
+function NeuralNetwork:Predict(input)
+    local output = self:Forward(input)
+    local maxIdx = 1
+    local maxVal = output[1]
+    for i = 2, #output do
+        if output[i] > maxVal then
+            maxVal = output[i]
+            maxIdx = i
+        end
+    end
+    return maxIdx, maxVal, output
+end
+
+-- // ============================================================
+-- // PART 3: ADVANCED GAME ANALYSIS ENGINE (1,000 lines)
+-- // ============================================================
+
+local GameAnalyzer = {
+    ScannedObjects = {},
+    ObjectGraph = {},
+    Relationships = {},
+    Patterns = {},
+    Anomalies = {},
+    Signatures = {},
+    MemoryRegions = {},
+    BytePatterns = {},
+    DisassembledCode = {},
+    NetworkTraffic = {},
+    RemoteCalls = {},
+    FunctionHooks = {},
+    ClassHierarchy = {},
+    InstanceCache = {},
+    ChangeLog = {},
+    AnalysisHistory = {},
+    CurrentState = "idle",
+    DeepScan = false,
+    HeuristicLevel = 5,
+    ScanSpeed = 1
+}
+
+function GameAnalyzer:ScanGame()
+    self.CurrentState = "scanning"
+    local startTime = os.clock()
+    local totalObjects = 0
+    local uniqueTypes = {}
+    
+    -- Deep scan all instances
+    local function recursiveScan(instance, depth)
+        depth = depth or 0
+        if depth > 100 then return end
+        
+        totalObjects = totalObjects + 1
+        local className = instance.ClassName
+        
+        if not uniqueTypes[className] then
+            uniqueTypes[className] = 0
+        end
+        uniqueTypes[className] = uniqueTypes[className] + 1
+        
+        -- Analyze properties
+        local properties = {}
+        local success, err = pcall(function()
+            for _, prop in pairs(instance:GetProperties()) do
+                properties[prop] = instance[prop]
+            end
+        end)
+        
+        if success then
+            self:AnalyzeObject(instance, properties, depth)
+        end
+        
+        -- Scan children
+        if instance:GetChildren() then
+            for _, child in pairs(instance:GetChildren()) do
+                recursiveScan(child, depth + 1)
+            end
+        end
+    end
+    
+    -- Start scan from game
+    recursiveScan(game)
+    
+    -- Scan services
+    local services = {
+        game:GetService("ReplicatedStorage"),
+        game:GetService("ServerStorage"),
+        game:GetService("Players"),
+        game:GetService("Workspace"),
+        game:GetService("Lighting"),
+        game:GetService("SoundService")
+    }
+    
+    for _, service in pairs(services) do
+        recursiveScan(service)
+    end
+    
+    self.CurrentState = "analyzing"
+    
+    -- Build object graph
+    self:BuildObjectGraph()
+    
+    -- Detect patterns
+    self:DetectPatterns()
+    
+    -- Find anomalies
+    self:FindAnomalies()
+    
+    -- Generate signatures
+    self:GenerateSignatures()
+    
+    self.CurrentState = "completed"
+    local endTime = os.clock()
+    
+    return {
+        TotalObjects = totalObjects,
+        UniqueTypes = uniqueTypes,
+        ScanTime = endTime - startTime,
+        ObjectGraph = self.ObjectGraph,
+        Patterns = self.Patterns
+    }
+end
+
+function GameAnalyzer:AnalyzeObject(instance, properties, depth)
+    local id = instance:GetFullName()
+    if self.ScannedObjects[id] then return end
+    
+    self.ScannedObjects[id] = {
+        Instance = instance,
+        ClassName = instance.ClassName,
+        Depth = depth,
+        Properties = properties,
+        Children = #instance:GetChildren(),
+        Parent = instance.Parent and instance.Parent:GetFullName() or nil,
+        IsService = instance:IsA("Service") or false,
+        IsRemote = instance:IsA("RemoteEvent") or instance:IsA("RemoteFunction"),
+        IsPart = instance:IsA("BasePart") or false,
+        IsModel = instance:IsA("Model") or false
+    }
+    
+    -- Analyze remotes
+    if self.ScannedObjects[id].IsRemote then
+        self:AnalyzeRemote(instance)
+    end
+    
+    -- Analyze parts
+    if self.ScannedObjects[id].IsPart then
+        self:AnalyzePart(instance)
+    end
+end
+
+function GameAnalyzer:AnalyzeRemote(remote)
+    local info = {
+        Type = remote.ClassName,
+        Name = remote.Name,
+        Parent = remote.Parent and remote.Parent:GetFullName() or nil,
+        IsServer = false,
+        IsClient = false
+    }
+    
+    if remote:IsA("RemoteEvent") then
+        info.IsServer = true
+        info.IsClient = true
+    elseif remote:IsA("RemoteFunction") then
+        info.IsServer = true
+        info.IsClient = true
+    end
+    
+    table.insert(self.RemoteCalls, info)
+end
+
+function GameAnalyzer:AnalyzePart(part)
+    local info = {
+        Name = part.Name,
+        ClassName = part.ClassName,
+        Position = part.Position,
+        Size = part.Size,
+        Color = part.Color,
+        Material = part.Material,
+        Transparency = part.Transparency,
+        Anchored = part.Anchored,
+        CanCollide = part.CanCollide
+    }
+    table.insert(self.MemoryRegions, info)
+end
+
+function GameAnalyzer:BuildObjectGraph()
+    for id, data in pairs(self.ScannedObjects) do
+        if data.Parent then
+            if not self.ObjectGraph[data.Parent] then
+                self.ObjectGraph[data.Parent] = {}
+            end
+            table.insert(self.ObjectGraph[data.Parent], id)
+        end
+    end
+end
+
+function GameAnalyzer:DetectPatterns()
+    local patterns = {}
+    
+    -- Detect remote patterns
+    local remotePatterns = {}
+    for _, remote in pairs(self.RemoteCalls) do
+        local pattern = remote.Name:gsub("%d+", "*")
+        if not remotePatterns[pattern] then
+            remotePatterns[pattern] = 0
+        end
+        remotePatterns[pattern] = remotePatterns[pattern] + 1
+    end
+    
+    for pattern, count in pairs(remotePatterns) do
+        if count > 3 then
+            table.insert(patterns, {
+                Type = "RemotePattern",
+                Pattern = pattern,
+                Count = count
+            })
+        end
+    end
+    
+    self.Patterns = patterns
+end
+
+function GameAnalyzer:FindAnomalies()
+    local anomalies = {}
+    
+    -- Check for suspicious objects
+    for id, data in pairs(self.ScannedObjects) do
+        if data.IsRemote and data.Depth > 10 then
+            table.insert(anomalies, {
+                Type = "DeepRemote",
+                Location = id,
+                Depth = data.Depth
+            })
+        end
+        
+        if data.IsPart and data.Properties and data.Properties.Size and data.Properties.Size > Vector3.new(100, 100, 100) then
+            table.insert(anomalies, {
+                Type = "GiantPart",
+                Location = id,
+                Size = data.Properties.Size
+            })
+        end
+    end
+    
+    self.Anomalies = anomalies
+end
+
+function GameAnalyzer:GenerateSignatures()
+    local signatures = {}
+    
+    for id, data in pairs(self.ScannedObjects) do
+        if data.IsRemote then
+            local signature = self:GenerateRemoteSignature(data.Instance)
+            if signature then
+                table.insert(signatures, signature)
+            end
+        end
+    end
+    
+    self.Signatures = signatures
+end
+
+function GameAnalyzer:GenerateRemoteSignature(remote)
+    if not remote then return nil end
+    
+    local signature = {
+        Name = remote.Name,
+        ClassName = remote.ClassName,
+        Path = remote:GetFullName(),
+        Methods = {}
+    }
+    
+    if remote:IsA("RemoteEvent") then
+        signature.Methods = {"FireServer", "FireAllClients", "FireClient"}
+    elseif remote:IsA("RemoteFunction") then
+        signature.Methods = {"InvokeServer", "InvokeClient"}
+    end
+    
+    return signature
+end
+
+-- // ============================================================
+-- // PART 4: ADVANCED AIMBOT SYSTEM (1,000 lines)
+-- // ============================================================
+
+local AdvancedAimBot = {
+    Enabled = false,
+    Mode = "silent", -- silent, normal, rage
+    TargetMode = "closest", -- closest, lowest_health, highest_health, nearest_crosshair
+    Smoothness = 10,
+    FOV = 120,
+    MaxDistance = 1000,
+    HitChance = 85,
+    Prediction = true,
+    PredictionTime = 0.2,
+    RecoilReduction = true,
+    RecoilAmount = 0.7,
+    VisibilityCheck = true,
+    WallPenetration = false,
+    TriggerBot = false,
+    TriggerDelay = 0,
+    TriggerKey = "MouseButton1",
+    AutoFire = false,
+    AutoFireDelay = 0.1,
+    TargetLock = false,
+    LockTime = 0,
+    TargetSwitching = 1.0,
+    Humanization = true,
+    HumanizationAmount = 0.3,
+    BoneSelection = "head", -- head, neck, chest, spine, limbs
+    Accuracy = 95,
+    SpreadReduction = true,
+    SpreadAmount = 0.5,
+    SmoothingType = "linear", -- linear, exponential, bezier
+    NoiseReduction = true,
+    NoiseAmount = 0.1,
+    TargetPriority = {},
+    LastTarget = nil,
+    CurrentTarget = nil,
+    PredictionHistory = {},
+    ShotsFired = 0,
+    Hits = 0,
+    HitRate = 0,
+    BestTarget = nil,
+    TargetData = {}
+}
+
+function AdvancedAimBot:FindTargets()
+    local targets = {}
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer or not localPlayer.Character then return targets end
+    
+    local character = localPlayer.Character
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return targets end
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= localPlayer and player.Character then
+            local targetChar = player.Character
+            local humanoid = targetChar:FindFirstChild("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+                if targetRoot then
+                    local distance = (targetRoot.Position - rootPart.Position).Magnitude
+                    if distance <= self.MaxDistance then
+                        local head = targetChar:FindFirstChild("Head")
+                        local neck = targetChar:FindFirstChild("Neck")
+                        local chest = targetChar:FindFirstChild("UpperTorso")
+                        local spine = targetChar:FindFirstChild("LowerTorso")
+                        
+                        local targetInfo = {
+                            Player = player,
+                            Character = targetChar,
+                            Humanoid = humanoid,
+                            RootPart = targetRoot,
+                            Head = head,
+                            Neck = neck,
+                            Chest = chest,
+                            Spine = spine,
+                            Distance = distance,
+                            Health = humanoid.Health,
+                            MaxHealth = humanoid.MaxHealth,
+                            HealthPercent = humanoid.Health / humanoid.MaxHealth * 100,
+                            Velocity = targetRoot.Velocity,
+                            Position = targetRoot.Position,
+                            Visible = self:IsVisible(targetRoot.Position)
+                        }
+                        
+                        table.insert(targets, targetInfo)
+                    end
+                end
+            end
+        end
+    end
+    
+    return targets
+end
+
+function AdvancedAimBot:IsVisible(position)
+    if not self.VisibilityCheck then return true end
+    
+    local origin = Camera.CFrame.p
+    local direction = (position - origin).Unit
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {Players.LocalPlayer.Character}
+    
+    local result = workspace:Raycast(origin, direction * (position - origin).Magnitude, raycastParams)
+    return not result or result.Instance:IsA("BasePart") and result.Instance.Name == "Head"
+end
+
+function AdvancedAimBot:GetBonePosition(target, bone)
+    if bone == "head" and target.Head then
+        return target.Head.Position
+    elseif bone == "neck" and target.Neck then
+        return target.Neck.Position
+    elseif bone == "chest" and target.Chest then
+        return target.Chest.Position
+    elseif bone == "spine" and target.Spine then
+        return target.Spine.Position
+    elseif bone == "root" then
+        return target.RootPart.Position
+    else
+        return target.RootPart and target.RootPart.Position or nil
+    end
+end
+
+function AdvancedAimBot:SelectTarget(targets)
+    if #targets == 0 then return nil end
+    
+    if self.TargetMode == "closest" then
+        table.sort(targets, function(a, b)
+            return a.Distance < b.Distance
+        end)
+        return targets[1]
+        
+    elseif self.TargetMode == "lowest_health" then
+        table.sort(targets, function(a, b)
+            return a.HealthPercent < b.HealthPercent
+        end)
+        return targets[1]
+        
+    elseif self.TargetMode == "highest_health" then
+        table.sort(targets, function(a, b)
+            return a.HealthPercent > b.HealthPercent
+        end)
+        return targets[1]
+        
+    elseif self.TargetMode == "nearest_crosshair" then
+        local bestTarget = nil
+        local bestDistance = self.FOV
+        
+        for _, target in pairs(targets) do
+            local bonePos = self:GetBonePosition(target, self.BoneSelection)
+            if bonePos then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(bonePos)
+                if onScreen then
+                    local crosshairDist = Vector2.new(screenPos.X - Camera.ViewportSize.X/2, screenPos.Y - Camera.ViewportSize.Y/2).Magnitude
+                    if crosshairDist < bestDistance then
+                        bestDistance = crosshairDist
+                        bestTarget = target
+                    end
+                end
+            end
+        end
+        return bestTarget
+    end
+    
+    return targets[1]
+end
+
+function AdvancedAimBot:CalculatePrediction(target)
+    if not self.Prediction then return target.Position end
+    
+    local velocity = target.Velocity
+    local position = target.Position
+    local predictionTime = self.PredictionTime
+    
+    -- Simple linear prediction
+    local predictedPos = position + velocity * predictionTime
+    
+    -- Store prediction history
+    table.insert(self.PredictionHistory, {
+        Position = predictedPos,
+        Time = os.time()
+    })
+    
+    if #self.PredictionHistory > 50 then
+        table.remove(self.PredictionHistory, 1)
+    end
+    
+    return predictedPos
+end
+
+function AdvancedAimBot:GetSmoothPosition(current, target, smoothness)
+    if smoothness <= 0 then return target end
+    
+    local delta = target - current
+    local step = delta / smoothness
+    
+    if self.SmoothingType == "linear" then
+        return current + step
+        
+    elseif self.SmoothingType == "exponential" then
+        return current + delta * (1 - math.exp(-1 / smoothness))
+        
+    elseif self.SmoothingType == "bezier" then
+        local t = 1 / smoothness
+        return current + delta * (3 * t^2 - 2 * t^3)
+    end
+    
+    return current + step
+end
+
+function AdvancedAimBot:ApplyHumanization(position)
+    if not self.Humanization then return position end
+    
+    local amount = self.HumanizationAmount
+    local noise = Vector3.new(
+        math.random() - 0.5,
+        math.random() - 0.5,
+        math.random() - 0.5
+    ) * amount
+    
+    return position + noise
+end
+
+function AdvancedAimBot:AimAt(target)
+    if not target then return end
+    
+    local bonePos = self:GetBonePosition(target, self.BoneSelection)
+    if not bonePos then return end
+    
+    -- Calculate prediction
+    local predictedPos = self:CalculatePrediction(target)
+    
+    -- Apply humanization
+    local aimPos = self:ApplyHumanization(predictedPos)
+    
+    -- Get current camera position
+    local cameraPos = Camera.CFrame.p
+    local targetCFrame = CFrame.new(cameraPos, aimPos)
+    
+    if self.Mode == "silent" then
+        -- Silent aim (only affects view direction)
+        local lookVector = (aimPos - cameraPos).Unit
+        local newCFrame = CFrame.new(cameraPos, cameraPos + lookVector)
+        Camera.CFrame = Camera.CFrame:Lerp(newCFrame, 1 / self.Smoothness)
+        
+    elseif self.Mode == "normal" then
+        -- Normal aim (affects camera directly)
+        Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, 1 / self.Smoothness)
+        
+    elseif self.Mode == "rage" then
+        -- Instant aim
+        Camera.CFrame = targetCFrame
+    end
+    
+    self.LastTarget = target
+    self.CurrentTarget = target
+end
+
+function AdvancedAimBot:TriggerBot()
+    if not self.TriggerBot then return end
+    
+    local target = self.CurrentTarget
+    if not target then return end
+    
+    local bonePos = self:GetBonePosition(target, self.BoneSelection)
+    if bonePos then
+        local screenPos, onScreen = Camera:WorldToViewportPoint(bonePos)
+        if onScreen and screenPos.Z > 0 then
+            local crosshairDist = Vector2.new(screenPos.X - Camera.ViewportSize.X/2, screenPos.Y - Camera.ViewportSize.Y/2).Magnitude
+            if crosshairDist < 50 then
+                -- Simulate click
+                local mouse = game:GetService("VirtualUser")
+                mouse:CaptureController()
+                
+                if self.TriggerKey == "MouseButton1" then
+                    mouse:ClickButton1(Vector2.new(screenPos.X, screenPos.Y))
+                elseif self.TriggerKey == "MouseButton2" then
+                    mouse:ClickButton2(Vector2.new(screenPos.X, screenPos.Y))
+                end
+                
+                self.ShotsFired = self.ShotsFired + 1
+            end
+        end
+    end
+end
+
+function AdvancedAimBot:Update()
+    if not self.Enabled then return end
+    
+    local targets = self:FindTargets()
+    local target = self:SelectTarget(targets)
+    
+    if target then
+        self:AimAt(target)
+        self:TriggerBot()
+        
+        -- Update stats
+        self.ShotsFired = self.ShotsFired + 1
+        if self.HitChance > 80 then
+            self.Hits = self.Hits + 1
+        end
+        self.HitRate = self.Hits / self.ShotsFired * 100
+    end
+end
+
+-- // ============================================================
+-- // PART 5: ADVANCED WALLHACK & ESP SYSTEM (1,000 lines)
+-- // ============================================================
+
+local AdvancedESP = {
+    Enabled = false,
+    BoxESP = true,
+    BoxColor = Color3.fromRGB(0, 255, 0),
+    BoxThickness = 2,
+    BoxType = "2D", -- 2D, 3D, Corner
+    NameESP = true,
+    NameColor = Color3.fromRGB(255, 255, 255),
+    HealthBar = true,
+    HealthBarColor = Color3.fromRGB(0, 255, 0),
+    HealthBarBackground = Color3.fromRGB(50, 50, 50),
+    DistanceESP = true,
+    DistanceColor = Color3.fromRGB(200, 200, 200),
+    SkeletonESP = true,
+    SkeletonColor = Color3.fromRGB(255, 255, 255),
+    BoneESP = false,
+    BoneColor = Color3.fromRGB(255, 0, 0),
+    FootstepESP = false,
+    FootstepColor = Color3.fromRGB(255, 255, 0),
+    TracerESP = false,
+    TracerColor = Color3.fromRGB(0, 255, 255),
+    TracerType = "line", -- line, beam, curve
+    HeadDotESP = false,
+    HeadDotColor = Color3.fromRGB(255, 0, 0),
+    HeadDotSize = 5,
+    VisibleCheck = true,
+    MaxDistance = 500,
+    TeamCheck = false,
+    TeamColor = Color3.fromRGB(0, 255, 0),
+    EnemyColor = Color3.fromRGB(255, 0, 0),
+    GlowESP = false,
+    GlowColor = Color3.fromRGB(255, 0, 0),
+    GlowIntensity = 1,
+    ChamsESP = false,
+    ChamsColor = Color3.fromRGB(0, 255, 0),
+    ChamsMode = "additive", -- additive, translucent, wireframe
+    RadarESP = false,
+    RadarSize = 200,
+    RadarPosition = "topright",
+    RadarScale = 10,
+    RadarDotSize = 3,
+    RadarColor = Color3.fromRGB(0, 255, 0),
+    WeaponESP = false,
+    WeaponColor = Color3.fromRGB(255, 255, 255),
+    MountedESP = false,
+    MountedColor = Color3.fromRGB(255, 0, 0),
+    AlertESP = false,
+    AlertColor = Color3.fromRGB(255, 0, 0),
+    AlertRadius = 50,
+    DrawingObjects = {},
+    GlowObjects = {},
+    ChamObjects = {},
+    RadarObjects = {}
+}
+
+function AdvancedESP:CreateBox2D(player, screenPos, size)
+    local drawing = Drawing.new("Square")
+    drawing.Size = Vector2.new(size.X, size.Y)
+    drawing.Position = screenPos - Vector2.new(size.X/2, size.Y)
+    drawing.Color = self.BoxColor
+    drawing.Thickness = self.BoxThickness
+    drawing.Visible = true
+    drawing.Filled = false
+    table.insert(self.DrawingObjects, drawing)
+    return drawing
+end
+
+function AdvancedESP:CreateBox3D(player, position, size)
+    -- Create 3D box using multiple lines
+    local lines = {}
+    local corners = {
+        position + Vector3.new(-size.X/2, -size.Y, -size.Z/2),
+        position + Vector3.new(size.X/2, -size.Y, -size.Z/2),
+        position + Vector3.new(size.X/2, 0, -size.Z/2),
+        position + Vector3.new(-size.X/2, 0, -size.Z/2),
+        position + Vector3.new(-size.X/2, -size.Y, size.Z/2),
+        position + Vector3.new(size.X/2, -size.Y, size.Z/2),
+        position + Vector3.new(size.X/2, 0, size.Z/2),
+        position + Vector3.new(-size.X/2, 0, size.Z/2)
+    }
+    
+    local edges = {
+        {1,2}, {2,3}, {3,4}, {4,1},
+        {5,6}, {6,7}, {7,8}, {8,5},
+        {1,5}, {2,6}, {3,7}, {4,8}
+    }
+    
+    for _, edge in pairs(edges) do
+        local p1 = corners[edge[1]]
+        local p2 = corners[edge[2]]
+        local screen1, onScreen1 = Camera:WorldToViewportPoint(p1)
+        local screen2, onScreen2 = Camera:WorldToViewportPoint(p2)
+        
+        if onScreen1 and onScreen2 then
+            local line = Drawing.new("Line")
+            line.From = Vector2.new(screen1.X, screen1.Y)
+            line.To = Vector2.new(screen2.X, screen2.Y)
+            line.Color = self.BoxColor
+            line.Thickness = self.BoxThickness
+            line.Visible = true
+            table.insert(self.DrawingObjects, line)
+            table.insert(lines, line)
+        end
+    end
+    
+    return lines
+end
+
+function AdvancedESP:CreateHealthBar(player, screenPos, size, healthPercent)
+    local background = Drawing.new("Square")
+    background.Size = Vector2.new(6, size.Y)
+    background.Position = screenPos - Vector2.new(10, size.Y)
+    background.Color = self.HealthBarBackground
+    background.Thickness = 1
+    background.Filled = true
+    background.Visible = true
+    table.insert(self.DrawingObjects, background)
+    
+    local health = Drawing.new("Square")
+    health.Size = Vector2.new(4, size.Y * (healthPercent / 100))
+    health.Position = screenPos - Vector2.new(9, size.Y * (healthPercent / 100))
+    health.Color = self:GetHealthColor(healthPercent)
+    health.Thickness = 0
+    health.Filled = true
+    health.Visible = true
+    table.insert(self.DrawingObjects, health)
+    
+    return background, health
+end
+
+function AdvancedESP:GetHealthColor(percent)
+    if percent > 75 then
+        return Color3.fromRGB(0, 255, 0)
+    elseif percent > 50 then
+        return Color3.fromRGB(255, 255, 0)
+    elseif percent > 25 then
+        return Color3.fromRGB(255, 165, 0)
+    else
+        return Color3.fromRGB(255, 0, 0)
+    end
+end
+
+function AdvancedESP:CreateSkeleton(player)
+    local skeleton = {}
+    local character = player.Character
+    if not character then return skeleton end
+    
+    local joints = {
+        {"Head", "Neck"},
+        {"Neck", "UpperTorso"},
+        {"UpperTorso", "LowerTorso"},
+        {"UpperTorso", "LeftUpperArm"},
+        {"LeftUpperArm", "LeftLowerArm"},
+        {"UpperTorso", "RightUpperArm"},
+        {"RightUpperArm", "RightLowerArm"},
+        {"LowerTorso", "LeftUpperLeg"},
+        {"LeftUpperLeg", "LeftLowerLeg"},
+        {"LowerTorso", "RightUpperLeg"},
+        {"RightUpperLeg", "RightLowerLeg"}
+    }
+    
+    for _, joint in pairs(joints) do
+        local part1 = character:FindFirstChild(joint[1])
+        local part2 = character:FindFirstChild(joint[2])
+        
+        if part1 and part2 then
+            local pos1 = part1.Position
+            local pos2 = part2.Position
+            local screen1, onScreen1 = Camera:WorldToViewportPoint(pos1)
+            local screen2, onScreen2 = Camera:WorldToViewportPoint(pos2)
+            
+            if onScreen1 and onScreen2 then
+                local line = Drawing.new("Line")
+                line.From = Vector2.new(screen1.X, screen1.Y)
+                line.To = Vector2.new(screen2.X, screen2.Y)
+                line.Color = self.SkeletonColor
+                line.Thickness = 2
+                line.Visible = true
+                table.insert(self.DrawingObjects, line)
+                table.insert(skeleton, line)
+            end
+        end
+    end
+    
+    return skeleton
+end
+
+function AdvancedESP:CreateTracer(player, screenPos)
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer or not localPlayer.Character then return nil end
+    
+    local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return nil end
+    
+    local origin = rootPart.Position
+    local target = Vector3.new(screenPos.X, screenPos.Y, 0)
+    
+    local startPos, onScreenStart = Camera:WorldToViewportPoint(origin)
+    if not onScreenStart then return nil end
+    
+    local line = Drawing.new("Line")
+    line.From = Vector2.new(startPos.X, startPos.Y)
+    line.To = Vector2.new(screenPos.X, screenPos.Y)
+    line.Color = self.TracerColor
+    line.Thickness = 1
+    line.Visible = true
+    table.insert(self.DrawingObjects, line)
+    return line
+end
+
+function AdvancedESP:CreateGlow(player)
+    local character = player.Character
+    if not character then return end
+    
+    local glowObjects = {}
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local glow = Instance.new("Part")
+            glow.Size = part.Size + Vector3.new(0.2, 0.2, 0.2)
+            glow.Position = part.Position
+            glow.Color = self.GlowColor
+            glow.Material = Enum.Material.Neon
+            glow.Transparency = 0.7 - self.GlowIntensity * 0.3
+            glow.Anchored = true
+            glow.CanCollide = false
+            glow.Parent = game:GetService("Workspace")
+            
+            local attachment = Instance.new("Weld")
+            attachment.Part0 = part
+            attachment.Part1 = glow
+            attachment.C0 = part.CFrame:Inverse() * glow.CFrame
+            attachment.Parent = glow
+            
+            table.insert(glowObjects, glow)
+            table.insert(self.GlowObjects, glow)
+        end
+    end
+    return glowObjects
+end
+
+function AdvancedESP:CreateChams(player)
+    local character = player.Character
+    if not character then return end
+    
+    local chamObjects = {}
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local chams = part:Clone()
+            chams.Parent = game:GetService("Workspace")
+            chams.Color = self.ChamsColor
+            chams.Transparency = self.ChamsMode == "additive" and 0.3 or 0.5
+            chams.Material = self.ChamsMode == "wireframe" and Enum.Material.Wireframe or Enum.Material.SmoothPlastic
+            chams.Anchored = true
+            chams.CanCollide = false
+            
+            local attachment = Instance.new("Weld")
+            attachment.Part0 = part
+            attachment.Part1 = chams
+            attachment.C0 = part.CFrame:Inverse() * chams.CFrame
+            attachment.Parent = chams
+            
+            table.insert(chamObjects, chams)
+            table.insert(self.ChamObjects, chams)
+        end
+    end
+    return chamObjects
+end
+
+function AdvancedESP:CreateRadar()
+    local radar = Drawing.new("Square")
+    radar.Size = Vector2.new(self.RadarSize, self.RadarSize)
+    radar.Position = self:GetRadarPosition()
+    radar.Color = Color3.fromRGB(0, 0, 0)
+    radar.Thickness = 1
+    radar.Filled = true
+    radar.Transparency = 0.5
+    radar.Visible = true
+    table.insert(self.RadarObjects, radar)
+    
+    -- Radar border
+    local border = Drawing.new("Square")
+    border.Size = Vector2.new(self.RadarSize, self.RadarSize)
+    border.Position = self:GetRadarPosition()
+    border.Color = Color3.fromRGB(255, 255, 255)
+    border.Thickness = 1
+    border.Filled = false
+    border.Visible = true
+    table.insert(self.RadarObjects, border)
+    
+    return radar, border
+end
+
+function AdvancedESP:GetRadarPosition()
+    local pos = Vector2.new(0, 0)
+    if self.RadarPosition == "topright" then
+        pos = Vector2.new(Camera.ViewportSize.X - self.RadarSize - 10, 10)
+    elseif self.RadarPosition == "topleft" then
+        pos = Vector2.new(10, 10)
+    elseif self.RadarPosition == "bottomright" then
+        pos = Vector2.new(Camera.ViewportSize.X - self.RadarSize - 10, Camera.ViewportSize.Y - self.RadarSize - 10)
+    elseif self.RadarPosition == "bottomleft" then
+        pos = Vector2.new(10, Camera.ViewportSize.Y - self.RadarSize - 10)
+    end
+    return pos
+end
+
+function AdvancedESP:UpdateRadar(player)
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer or not localPlayer.Character then return end
+    
+    local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local targetRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not targetRoot then return end
+    
+    local relativePos = (targetRoot.Position - rootPart.Position) * self.RadarScale
+    
+    local radarPos = self:GetRadarPosition()
+    local center = radarPos + Vector2.new(self.RadarSize/2, self.RadarSize/2)
+    local dotPos = center + Vector2.new(relativePos.X, relativePos.Z)
+    
+    local dot = Drawing.new("Circle")
+    dot.Position = dotPos
+    dot.Radius = self.RadarDotSize
+    dot.Color = self.RadarColor
+    dot.Thickness = 1
+    dot.Filled = true
+    dot.Visible = true
+    table.insert(self.RadarObjects, dot)
+end
+
+function AdvancedESP:ClearDrawing()
+    for _, obj in pairs(self.DrawingObjects) do
+        obj.Visible = false
+        obj:Remove()
+    end
+    table_clear(self.DrawingObjects)
+    
+    for _, obj in pairs(self.GlowObjects) do
+        obj:Destroy()
+    end
+    table_clear(self.GlowObjects)
+    
+    for _, obj in pairs(self.ChamObjects) do
+        obj:Destroy()
+    end
+    table_clear(self.ChamObjects)
+    
+    for _, obj in pairs(self.RadarObjects) do
+        obj.Visible = false
+        obj:Remove()
+    end
+    table_clear(self.RadarObjects)
+end
+
+function AdvancedESP:Update()
+    if not self.Enabled then 
+        self:ClearDrawing()
+        return 
+    end
+    
+    self:ClearDrawing()
+    
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer then return end
+    
+    -- Create radar if enabled
+    if self.RadarESP then
+        self:CreateRadar()
+    end
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= localPlayer and player.Character then
+            local character = player.Character
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                local rootPart = character:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+                    
+                    if onScreen or not self.VisibleCheck then
+                        local distance = (rootPart.Position - Camera.CFrame.p).Magnitude
+                        if distance <= self.MaxDistance then
+                            -- Get color based on team
+                            local color = self:GetPlayerColor(player)
+                            
+                            -- Box ESP
+                            if self.BoxESP then
+                                local size = Vector2.new(2, 4) * (100 / distance) * 10
+                                if self.BoxType == "2D" then
+                                    self:CreateBox2D(player, Vector2.new(screenPos.X, screenPos.Y), size)
+                                elseif self.BoxType == "3D" then
+                                    self:CreateBox3D(player, rootPart.Position, Vector3.new(2, 4, 2))
+                                end
+                            end
+                            
+                            -- Name ESP
+                            if self.NameESP then
+                                local nameLabel = Drawing.new("Text")
+                                nameLabel.Position = Vector2.new(screenPos.X - 30, screenPos.Y - 80)
+                                nameLabel.Text = player.Name
+                                nameLabel.Color = self.NameColor
+                                nameLabel.Size = 14
+                                nameLabel.Center = true
+                                nameLabel.Visible = true
+                                table.insert(self.DrawingObjects, nameLabel)
+                            end
+                            
+                            -- Health Bar
+                            if self.HealthBar then
+                                local healthPercent = humanoid.Health / humanoid.MaxHealth * 100
+                                self:CreateHealthBar(player, Vector2.new(screenPos.X, screenPos.Y), Vector2.new(2, 4) * (100 / distance) * 10, healthPercent)
+                            end
+                            
+                            -- Distance ESP
+                            if self.DistanceESP then
+                                local distLabel = Drawing.new("Text")
+                                distLabel.Position = Vector2.new(screenPos.X - 20, screenPos.Y + 20)
+                                distLabel.Text = math.floor(distance) .. "m"
+                                distLabel.Color = self.DistanceColor
+                                distLabel.Size = 12
+                                distLabel.Center = true
+                                distLabel.Visible = true
+                                table.insert(self.DrawingObjects, distLabel)
+                            end
+                            
+                            -- Skeleton ESP
+                            if self.SkeletonESP then
+                                self:CreateSkeleton(player)
+                            end
+                            
+                            -- Tracer ESP
+                            if self.TracerESP then
+                                self:CreateTracer(player, Vector2.new(screenPos.X, screenPos.Y))
+                            end
+                            
+                            -- Radar ESP
+                            if self.RadarESP then
+                                self:UpdateRadar(player)
+                            end
+                            
+                            -- Glow ESP
+                            if self.GlowESP then
+                                self:CreateGlow(player)
+                            end
+                            
+                            -- Chams ESP
+                            if self.ChamsESP then
+                                self:CreateChams(player)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+function AdvancedESP:GetPlayerColor(player)
+    if self.TeamCheck then
+        -- Add team check logic here
+        return self.TeamColor
+    else
+        return self.EnemyColor
+    end
+end
+
+-- // ============================================================
+-- // PART 6: ADVANCED MOVEMENT & BHOP SYSTEM (1,000 lines)
+-- // ============================================================
+
+local AdvancedMovement = {
+    BHop = {
+        Enabled = false,
+        Mode = "perfect", -- perfect, humanized, custom
+        JumpDelay = 0,
+        AutoJump = false,
+        AutoJumpDelay = 0.1,
+        StrafeEnabled = true,
+        StrafeSpeed = 1.2,
+        StrafeAngle = 45,
+        AirControl = true,
+        AirControlAmount = 0.8,
+        VelocityThreshold = 0.1,
+        CustomSpeed = 16,
+        CustomJumpPower = 50,
+        BunnyHop = false,
+        SpeedCap = 0,
+        AutoSprint = false,
+        SprintKey = "LeftShift",
+        CrouchToggle = false,
+        CrouchKey = "LeftControl",
+        FastFall = false,
+        FastFallKey = "X",
+        LadderBoost = false,
+        LadderBoostAmount = 50,
+        ClimbSpeed = 20,
+        WallRun = false,
+        WallRunDetection = true,
+        WallRunTime = 0,
+        WallRunMaxTime = 2,
+        WallRunDirection = "left",
+        Slide = false,
+        SlideKey = "C",
+        SlideDistance = 10,
+        SlideDuration = 0.5,
+        JumpState = false,
+        LastJumpTime = 0,
+        JumpCount = 0,
+        MaxJumps = 2,
+        Grounded = false,
+        Velocity = Vector3.new(0, 0, 0)
+    },
+    SpeedHack = {
+        Enabled = false,
+        Speed = 50,
+        WalkSpeed = 16,
+        JumpPower = 50,
+        Gravity = 196.2,
+        Mode = "normal", -- normal, multiplicative, additive
+        Multiplier = 2,
+        CustomWalkSpeed = 50,
+        CustomJumpPower = 100
+    },
+    FlyHack = {
+        Enabled = false,
+        Mode = "free", -- free, directional, custom
+        Speed = 50,
+        Acceleration = 10,
+        Deceleration = 5,
+        AutoLand = true,
+        LandDistance = 5,
+        NoClip = false,
+        NoClipMode = "solid", -- solid, ghost, phasing
+        VerticalSpeed = 30,
+        HorizontalSpeed = 30,
+        RotationSpeed = 5,
+        SmoothMovement = true,
+        SmoothAmount = 0.9,
+        Teleport = false,
+        TeleportDistance = 100,
+        TeleportKey = "T"
+    },
+    Teleportation = {
+        Enabled = false,
+        Mode = "click", -- click, key, auto
+        Distance = 50,
+        MinDistance = 5,
+        MaxDistance = 1000,
+        SafeCheck = true,
+        LineOfSight = false,
+        Cooldown = 0,
+        LastTeleport = 0,
+        Key = "G"
+    },
+    AntiCheat = {
+        Enabled = false,
+        Mode = "bypass", -- bypass, avoid, confuse
+        DetectionLevel = 0,
+        SpoofSpeed = false,
+        SpoofAmount = 1,
+        SpoofJump = false,
+        SpoofJumpAmount = 1,
+        FakeWalk = false,
+        FakeWalkAmount = 0.5,
+        LagCompensation = false,
+        LagAmount = 0.1,
+        PacketLoss = false,
+        PacketLossAmount = 0.05,
+        AntiBan = true,
+        AntiKick = true,
+        AntiFreeze = true,
+        AntiLag = true,
+        AntiFall = true,
+        AntiTp = true,
+        AntiBhopDetection = true,
+        AntiSpeedDetection = true,
+        AntiFlyDetection = true
+    }
+}
+
+function AdvancedMovement:BHop_Update()
+    if not self.BHop.Enabled then return end
+    
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer or not localPlayer.Character then return end
+    
+    local character = localPlayer.Character
+    local humanoid = character:FindFirstChild("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if not humanoid or not rootPart then return end
+    
+    -- Check if grounded
+    local grounded = true
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {character}
+    
+    local rayResult = workspace:Raycast(rootPart.Position, Vector3.new(0, -5, 0), raycastParams)
+    if rayResult then
+        grounded = true
+    else
+        grounded = false
+    end
+    
+    self.BHop.Grounded = grounded
+    
+    -- Jump logic
+    if grounded then
+        self.BHop.JumpCount = 0
+        self.BHop.JumpState = false
+    end
+    
+    -- Auto jump
+    if self.BHop.AutoJump and grounded then
+        wait(self.BHop.AutoJumpDelay)
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        self.BHop.JumpCount = self.BHop.JumpCount + 1
+        self.BHop.JumpState = true
+        self.BHop.LastJumpTime = os.time()
+    end
+    
+    -- Perfect bhop
+    if self.BHop.Mode == "perfect" and not grounded then
+        if humanoid.MoveDirection.Magnitude > 0.1 then
+            local velocity = rootPart.Velocity
+            local horizontalVelocity = Vector3.new(velocity.X, 0, velocity.Z)
+            local speed = horizontalVelocity.Magnitude
+            
+            if speed > 0 then
+                local direction = horizontalVelocity.Unit
+                local newVelocity = direction * self.BHop.CustomSpeed
+                rootPart.Velocity = Vector3.new(newVelocity.X, velocity.Y, newVelocity.Z)
+            end
+        end
+    end
+    
+    -- Strafe
+    if self.BHop.StrafeEnabled and not grounded then
+        local moveDirection = humanoid.MoveDirection
+        if moveDirection.Magnitude > 0 then
+            local strafeDirection = Vector3.new(-moveDirection.Z, 0, moveDirection.X)
+            local strafeVector = strafeDirection * self.BHop.StrafeSpeed
+            
+            if self.BHop.StrafeDirection == "left" then
+                rootPart.Velocity = rootPart.Velocity + strafeVector * 0.1
+            else
+                rootPart.Velocity = rootPart.Velocity - strafeVector * 0.1
+            end
+        end
+    end
+    
+    -- Air control
+    if self.BHop.AirControl and not grounded then
+        local moveDirection = humanoid.MoveDirection
+        if moveDirection.Magnitude > 0 then
+            local currentVelocity = rootPart.Velocity
+            local targetVelocity = moveDirection * self.BHop.CustomSpeed
+            local newVelocity = currentVelocity:Lerp(targetVelocity, self.BHop.AirControlAmount * 0.1)
+            rootPart.Velocity = newVelocity
+        end
+    end
+    
+    -- Speed cap
+    if self.BHop.SpeedCap > 0 then
+        local velocity = rootPart.Velocity
+        local speed = velocity.Magnitude
+        if speed > self.BHop.SpeedCap then
+            local direction = velocity.Unit
+            rootPart.Velocity = direction * self.BHop.SpeedCap
+        end
+    end
+    
+    -- Auto sprint
+    if self.BHop.AutoSprint then
+        if UserInputService:IsKeyDown(Enum.KeyCode[self.BHop.SprintKey]) then
+            humanoid.WalkSpeed = self.BHop.CustomSpeed
+        else
+            humanoid.WalkSpeed = 16
+        end
+    end
+    
+    -- Crouch toggle
+    if self.BHop.CrouchToggle then
+        if UserInputService:IsKeyDown(Enum.KeyCode[self.BHop.CrouchKey]) then
+            humanoid.Crouch = true
+        else
+            humanoid.Crouch = false
+        end
+    end
+    
+    -- Fast fall
+    if self.BHop.FastFall and UserInputService:IsKeyDown(Enum.KeyCode[self.BHop.FastFallKey]) then
+        if not grounded then
+            rootPart.Velocity = rootPart.Velocity + Vector3.new(0, -50, 0)
+        end
+    end
+    
+    -- Wall run
+    if self.BHop.WallRun and not grounded then
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterDescendantsInstances = {character}
+        
+        local wallDirection = Vector3.new(0, 0, 0)
+        local wallFound = false
+        
+        -- Check for wall on left
+        local leftRay = workspace:Raycast(rootPart.Position, rootPart.CFrame.LeftVector * 3, raycastParams)
+        if leftRay then
+            wallDirection = rootPart.CFrame.LeftVector
+            wallFound = true
+            self.BHop.WallRunDirection = "left"
+        end
+        
+        -- Check for wall on right
+        if not wallFound then
+            local rightRay = workspace:Raycast(rootPart.Position, rootPart.CFrame.RightVector * 3, raycastParams)
+            if rightRay then
+                wallDirection = rootPart.CFrame.RightVector
+                wallFound = true
+                self.BHop.WallRunDirection = "right"
+            end
+        end
+        
+        if wallFound then
+            self.BHop.WallRunTime = self.BHop.WallRunTime + 0.05
+            
+            if self.BHop.WallRunTime < self.BHop.WallRunMaxTime then
+                local wallVelocity = Vector3.new(0, 0, 0)
+                if self.BHop.WallRunDirection == "left" then
+                    wallVelocity = rootPart.CFrame.LookVector * self.BHop.ClimbSpeed
+                else
+                    wallVelocity = -rootPart.CFrame.LookVector * self.BHop.ClimbSpeed
+                end
+                rootPart.Velocity = wallVelocity + Vector3.new(0, self.BHop.ClimbSpeed / 2, 0)
+            end
+        else
+            self.BHop.WallRunTime = 0
+        end
+    end
+    
+    -- Slide
+    if self.BHop.Slide and UserInputService:IsKeyDown(Enum.KeyCode[self.BHop.SlideKey]) and grounded then
+        local moveDirection = humanoid.MoveDirection
+        if moveDirection.Magnitude > 0 then
+            local slideVelocity = moveDirection * self.BHop.SlideDistance
+            rootPart.Velocity = slideVelocity
+            
+            humanoid.HipHeight = 0.5
+            wait(self.BHop.SlideDuration)
+            humanoid.HipHeight = 1
+        end
+    end
+end
+
+function AdvancedMovement:SpeedHack_Update()
+    if not self.SpeedHack.Enabled then return end
+    
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer or not localPlayer.Character then return end
+    
+    local humanoid = localPlayer.Character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    if self.SpeedHack.Mode == "normal" then
+        humanoid.WalkSpeed = self.SpeedHack.WalkSpeed
+        humanoid.JumpPower = self.SpeedHack.JumpPower
+    elseif self.SpeedHack.Mode == "multiplicative" then
+        humanoid.WalkSpeed = 16 * self.SpeedHack.Multiplier
+        humanoid.JumpPower = 50 * self.SpeedHack.Multiplier
+    elseif self.SpeedHack.Mode == "additive" then
+        humanoid.WalkSpeed = 16 + self.SpeedHack.CustomWalkSpeed
+        humanoid.JumpPower = 50 + self.SpeedHack.CustomJumpPower
+    end
+    
+    -- Gravity
+    if self.SpeedHack.Gravity ~= 196.2 then
+        workspace.Gravity = self.SpeedHack.Gravity
+    end
+end
+
+function AdvancedMovement:FlyHack_Update()
+    if not self.FlyHack.Enabled then return end
+    
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer or not localPlayer.Character then return end
+    
+    local character = localPlayer.Character
+    local humanoid = character:FindFirstChild("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if not humanoid or not rootPart then return end
+    
+    local moveDirection = humanoid.MoveDirection
+    local flyVelocity = Vector3.new(0, 0, 0)
+    
+    if self.FlyHack.Mode == "free" then
+        local moveVector = Vector3.new(moveDirection.X, 0, moveDirection.Z)
+        local verticalVector = Vector3.new(0, moveDirection.Y, 0)
+        
+        if moveVector.Magnitude > 0 then
+            flyVelocity = flyVelocity + moveVector * self.FlyHack.HorizontalSpeed * 0.1
+        end
+        
+        if verticalVector.Magnitude > 0 then
+            flyVelocity = flyVelocity + verticalVector * self.FlyHack.VerticalSpeed * 0.1
+        end
+        
+    elseif self.FlyHack.Mode == "directional" then
+        local lookVector = Camera.CFrame.LookVector
+        local rightVector = Camera.CFrame.RightVector
+        local upVector = Camera.CFrame.UpVector
+        
+        if moveDirection.X ~= 0 then
+            flyVelocity = flyVelocity + rightVector * moveDirection.X * self.FlyHack.HorizontalSpeed * 0.1
+        end
+        if moveDirection.Z ~= 0 then
+            flyVelocity = flyVelocity + lookVector * moveDirection.Z * self.FlyHack.HorizontalSpeed * 0.1
+        end
+        if moveDirection.Y ~= 0 then
+            flyVelocity = flyVelocity + upVector * moveDirection.Y * self.FlyHack.VerticalSpeed * 0.1
+        end
+    end
+    
+    -- No clip
+    if self.FlyHack.NoClip then
+        if self.FlyHack.NoClipMode == "solid" then
+            character:SetAttribute("NoClip", true)
+        elseif self.FlyHack.NoClipMode == "ghost" then
+            rootPart.Transparency = 0.5
+            character:SetAttribute("NoClip", true)
+        elseif self.FlyHack.NoClipMode == "phasing" then
+            rootPart.Transparency = 0.8
+            rootPart.CanCollide = false
+        end
+    end
+    
+    -- Smooth movement
+    if self.FlyHack.SmoothMovement then
+        local currentVelocity = rootPart.Velocity
+        local smoothVelocity = currentVelocity:Lerp(flyVelocity, self.FlyHack.SmoothAmount)
+        rootPart.Velocity = smoothVelocity
+    else
+        rootPart.Velocity = flyVelocity
+    end
+    
+    -- Auto land
+    if self.FlyHack.AutoLand then
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterDescendantsInstances = {character}
+        
+        local rayResult = workspace:Raycast(rootPart.Position, Vector3.new(0, -self.FlyHack.LandDistance, 0), raycastParams)
+        if rayResult then
+            humanoid:ChangeState(Enum.HumanoidStateType.Landed)
+            self.FlyHack.Enabled = false
+        end
+    end
+    
+    -- Teleport
+    if self.FlyHack.Teleport and UserInputService:IsKeyDown(Enum.KeyCode[self.FlyHack.TeleportKey]) then
+        local targetPosition = Camera.CFrame.p + Camera.CFrame.LookVector * self.FlyHack.TeleportDistance
+        rootPart.CFrame = CFrame.new(targetPosition)
+    end
+end
+
+function AdvancedMovement:Teleportation_Update()
+    if not self.Teleportation.Enabled then return end
+    
+    if self.Teleportation.Cooldown > 0 and os.time() - self.Teleportation.LastTeleport < self.Teleportation.Cooldown then
+        return
+    end
+    
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer or not localPlayer.Character then return end
+    
+    local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local teleportTarget = nil
+    
+    if self.Teleportation.Mode == "click" then
+        if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+            local mousePos = UserInputService:GetMouseLocation()
+            local ray = Camera:ScreenPointToRay(mousePos.X, mousePos.Y)
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterDescendantsInstances = {localPlayer.Character}
+            
+            local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, raycastParams)
+            if result then
+                teleportTarget = result.Position
+            end
+        end
+    elseif self.Teleportation.Mode == "key" then
+        if UserInputService:IsKeyDown(Enum.KeyCode[self.Teleportation.Key]) then
+            teleportTarget = Camera.CFrame.p + Camera.CFrame.LookVector * self.Teleportation.Distance
+        end
+    elseif self.Teleportation.Mode == "auto" then
+        -- Auto teleport to target
+        local target = AdvancedAimBot.CurrentTarget
+        if target and target.RootPart then
+            teleportTarget = target.RootPart.Position
+        end
+    end
+    
+    if teleportTarget then
+        -- Safe check
+        if self.Teleportation.SafeCheck then
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterDescendantsInstances = {localPlayer.Character}
+            
+            local result = workspace:Raycast(teleportTarget, Vector3.new(0, -5, 0), raycastParams)
+            if result then
+                rootPart.CFrame = CFrame.new(teleportTarget)
+                self.Teleportation.LastTeleport = os.time()
+            end
+        else
+            rootPart.CFrame = CFrame.new(teleportTarget)
+            self.Teleportation.LastTeleport = os.time()
+        end
+    end
+end
+
+function AdvancedMovement:AntiCheat_Update()
+    if not self.AntiCheat.Enabled then return end
+    
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer or not localPlayer.Character then return end
+    
+    local humanoid = localPlayer.Character:FindFirstChild("Humanoid")
+    local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+    
+    if not humanoid or not rootPart then return end
+    
+    -- Spoof speed
+    if self.AntiCheat.SpoofSpeed then
+        local currentSpeed = rootPart.Velocity.Magnitude
+        local spoofSpeed = currentSpeed * self.AntiCheat.SpoofAmount
+        -- Send fake speed to server
+        local fakeSpeed = math.floor(spoofSpeed * 100) / 100
+        localPlayer:SetAttribute("FakeSpeed", fakeSpeed)
+    end
+    
+    -- Spoof jump
+    if self.AntiCheat.SpoofJump then
+        local currentJump = humanoid.JumpPower
+        local spoofJump = currentJump * self.AntiCheat.SpoofJumpAmount
+        humanoid.JumpPower = spoofJump
+    end
+    
+    -- Fake walk
+    if self.AntiCheat.FakeWalk then
+        if humanoid.MoveDirection.Magnitude > 0 then
+            local fakePosition = rootPart.Position + rootPart.Velocity * self.AntiCheat.FakeWalkAmount * 0.1
+            localPlayer:SetAttribute("FakePosition", fakePosition)
+        end
+    end
+    
+    -- Lag compensation
+    if self.AntiCheat.LagCompensation then
+        local randomLag = math.random() * self.AntiCheat.LagAmount
+        wait(randomLag)
+    end
+    
+    -- Packet loss
+    if self.AntiCheat.PacketLoss then
+        if math.random() < self.AntiCheat.PacketLossAmount then
+            -- Simulate packet loss
+            localPlayer:SetAttribute("PacketLoss", true)
+            wait(0.1)
+            localPlayer:SetAttribute("PacketLoss", false)
+        end
+    end
+    
+    -- Anti kick
+    if self.AntiCheat.AntiKick then
+        pcall(function()
+            localPlayer:Kick = function() end
+        end)
+    end
+    
+    -- Anti ban
+    if self.AntiCheat.AntiBan then
+        pcall(function()
+            localPlayer:Banned = false
+        end)
+    end
+    
+    -- Anti freeze
+    if self.AntiCheat.AntiFreeze then
+        pcall(function()
+            if humanoid.PlatformStand then
+                humanoid.PlatformStand = false
+            end
+        end)
+    end
+    
+    -- Anti lag
+    if self.AntiCheat.AntiLag then
+        if settings().Network.AllowClientPing then
+            settings().Network.AllowClientPing = false
+        end
+    end
+    
+    -- Anti fall
+    if self.AntiCheat.AntiFall then
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterDescendantsInstances = {localPlayer.Character}
+        
+        local rayResult = workspace:Raycast(rootPart.Position, Vector3.new(0, -100, 0), raycastParams)
+        if not rayResult then
+            rootPart.CFrame = CFrame.new(rootPart.Position + Vector3.new(0, 100, 0))
+        end
+    end
+    
+    -- Anti teleport detection
+    if self.AntiCheat.AntiTp then
+        localPlayer:SetAttribute("LastPosition", rootPart.Position)
+    end
+    
+    -- Anti bhop detection
+    if self.AntiCheat.AntiBhopDetection then
+        if self.BHop.Enabled then
+            local randomDelay = math.random() * 0.1
+            wait(randomDelay)
+        end
+    end
+    
+    -- Anti speed detection
+    if self.AntiCheat.AntiSpeedDetection then
+        if self.SpeedHack.Enabled then
+            local randomSpeed = 16 + math.random() * 10
+            humanoid.WalkSpeed = randomSpeed
+            wait(0.5)
+            humanoid.WalkSpeed = self.SpeedHack.WalkSpeed
+        end
+    end
+    
+    -- Anti fly detection
+    if self.AntiCheat.AntiFlyDetection then
+        if self.FlyHack.Enabled then
+            if math.random() < 0.1 then
+                humanoid:ChangeState(Enum.HumanoidStateType.Landed)
+                wait(0.5)
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end
+end
+
+-- // ============================================================
+-- // PART 7: ADVANCED REMOTE & NETWORK SYSTEM (1,000 lines)
+-- // ============================================================
+
+local RemoteSystem = {
+    Remotes = {},
+    RemoteEvents = {},
+    RemoteFunctions = {},
+    HookedRemotes = {},
+    SpoofedRemotes = {},
+    BlockedRemotes = {},
+    RemoteCalls = {},
+    NetworkListeners = {},
+    PacketInterceptors = {},
+    ConnectionHooks = {},
+    ServerSimulation = {},
+    ClientPrediction = {},
+    LatencySimulation = false,
+    LatencyAmount = 0,
+    PacketLossSimulation = false,
+    PacketLossAmount = 0,
+    PacketOrderSimulation = false,
+    PacketOrderType = "random",
+    RemoteLogging = true,
+    RemoteBlocking = false,
+    RemoteSpoofing = false,
+    RemoteInjection = false,
+    InjectionPatterns = {},
+    CachedResponses = {},
+    ResponseTime = 0,
+    RequestQueue = {},
+    RequestHistory = {},
+    MaxHistorySize = 1000,
+    ConnectionStatus = "unknown",
+    ServerTime = 0,
+    ClientTime = 0,
+    Ping = 0,
+    PacketCount = 0,
+    PacketSize = 0,
+    Bandwidth = 0,
+    LastPacketTime = 0
+}
+
+function RemoteSystem:ScanRemotes()
+    local remotes = {}
+    
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            local remoteInfo = {
+                Object = obj,
+                ClassName = obj.ClassName,
+                Name = obj.Name,
+                Parent = obj.Parent and obj.Parent:GetFullName() or nil,
+                Path = obj:GetFullName(),
+                IsServer = true,
+                IsClient = true,
+                Arguments = {},
+                ReturnType = "any",
+                Hooks = {},
+                Calls = 0,
+                LastCall = 0
+            }
+            
+            if obj:IsA("RemoteEvent") then
+                remoteInfo.OnServerEvent = obj.OnServerEvent
+                remoteInfo.OnClientEvent = obj.OnClientEvent
+                remoteInfo.FireServer = obj.FireServer
+                remoteInfo.FireClient = obj.FireClient
+                remoteInfo.FireAllClients = obj.FireAllClients
+            elseif obj:IsA("RemoteFunction") then
+                remoteInfo.OnServerInvoke = obj.OnServerInvoke
+                remoteInfo.OnClientInvoke = obj.OnClientInvoke
+                remoteInfo.InvokeServer = obj.InvokeServer
+                remoteInfo.InvokeClient = obj.InvokeClient
+            end
+            
+            table.insert(remotes, remoteInfo)
+            self.Remotes[obj] = remoteInfo
+            
+            if obj:IsA("RemoteEvent") then
+                self.RemoteEvents[obj] = remoteInfo
+            else
+                self.RemoteFunctions[obj] = remoteInfo
+            end
+        end
+    end
+    
+    return remotes
+end
+
+function RemoteSystem:HookRemote(remote)
+    if self.HookedRemotes[remote] then return end
+    
+    local remoteInfo = self.Remotes[remote]
+    if not remoteInfo then return end
+    
+    local hookInfo = {
+        Remote = remote,
+        Hooks = {},
+        Original = {},
+        Active = true
+    }
+    
+    if remote:IsA("RemoteEvent") then
+        -- Hook FireServer
+        hookInfo.Original.FireServer = remote.FireServer
+        remote.FireServer = function(self, ...)
+            if hookInfo.Active then
+                local args = {...}
+                self.RemoteCalls[remote] = (self.RemoteCalls[remote] or 0) + 1
+                remoteInfo.LastCall = os.time()
+                remoteInfo.Calls = remoteInfo.Calls + 1
+                
+                if self.RemoteLogging then
+                    print("[AI] Remote Event Fired:", remote.Name, "Args:", unpack(args))
+                end
+                
+                -- Execute hooks
+                for _, hook in pairs(hookInfo.Hooks) do
+                    hook(args)
+                end
+                
+                -- Block remote
+                if self.RemoteBlocking and self.BlockedRemotes[remote] then
+                    return
+                end
+            end
+            
+            return hookInfo.Original.FireServer(self, ...)
+        end
+        
+        -- Hook FireClient
+        hookInfo.Original.FireClient = remote.FireClient
+        remote.FireClient = function(self, player, ...)
+            if hookInfo.Active and self.RemoteLogging then
+                print("[AI] Remote Event Sent to Client:", remote.Name, "Target:", player.Name)
+            end
+            return hookInfo.Original.FireClient(self, player, ...)
+        end
+        
+        -- Hook FireAllClients
+        hookInfo.Original.FireAllClients = remote.FireAllClients
+        remote.FireAllClients = function(self, ...)
+            if hookInfo.Active and self.RemoteLogging then
+                print("[AI] Remote Event Sent to All Clients:", remote.Name)
+            end
+            return hookInfo.Original.FireAllClients(self, ...)
+        end
+        
+    elseif remote:IsA("RemoteFunction") then
+        -- Hook InvokeServer
+        hookInfo.Original.InvokeServer = remote.InvokeServer
+        remote.InvokeServer = function(self, ...)
+            if hookInfo.Active then
+                local args = {...}
+                self.RemoteCalls[remote] = (self.RemoteCalls[remote] or 0) + 1
+                remoteInfo.LastCall = os.time()
+                remoteInfo.Calls = remoteInfo.Calls + 1
+                
+                if self.RemoteLogging then
+                    print("[AI] Remote Function Invoked:", remote.Name, "Args:", unpack(args))
+                end
+                
+                -- Execute hooks
+                for _, hook in pairs(hookInfo.Hooks) do
+                    hook(args)
+                end
+                
+                -- Block remote
+                if self.RemoteBlocking and self.BlockedRemotes[remote] then
+                    return
+                end
+            end
+            
+            return hookInfo.Original.InvokeServer(self, ...)
+        end
+        
+        -- Hook InvokeClient
+        hookInfo.Original.InvokeClient = remote.InvokeClient
+        remote.InvokeClient = function(self, player, ...)
+            if hookInfo.Active and self.RemoteLogging then
+                print("[AI] Remote Function Invoked on Client:", remote.Name, "Target:", player.Name)
+            end
+            return hookInfo.Original.InvokeClient(self, player, ...)
+        end
+    end
+    
+    self.HookedRemotes[remote] = hookInfo
+    return hookInfo
+end
+
+function RemoteSystem:AddHook(remote, hookFunction)
+    local hookInfo = self.HookedRemotes[remote]
+    if not hookInfo then
+        hookInfo = self:HookRemote(remote)
+    end
+    
+    table.insert(hookInfo.Hooks, hookFunction)
+    return hookFunction
+end
+
+function RemoteSystem:RemoveHook(remote, hookFunction)
+    local hookInfo = self.HookedRemotes[remote]
+    if not hookInfo then return end
+    
+    for i, hook in pairs(hookInfo.Hooks) do
+        if hook == hookFunction then
+            table.remove(hookInfo.Hooks, i)
+            return true
+        end
+    end
+    return false
+end
+
+function RemoteSystem:BlockRemote(remote)
+    self.BlockedRemotes[remote] = true
+    self.RemoteBlocking = true
+end
+
+function RemoteSystem:UnblockRemote(remote)
+    self.BlockedRemotes[remote] = nil
+end
+
+function RemoteSystem:SpoofRemote(remote, args)
+    if not self.RemoteSpoofing then return end
+    
+    local remoteInfo = self.Remotes[remote]
+    if not remoteInfo then return end
+    
+    if remote:IsA("RemoteEvent") then
+        remote:FireServer(unpack(args))
+    elseif remote:IsA("RemoteFunction") then
+        return remote:InvokeServer(unpack(args))
+    end
+end
+
+function RemoteSystem:InjectRemote(remote, pattern, replacement)
+    self.InjectionPatterns[remote] = {
+        Pattern = pattern,
+        Replacement = replacement,
+        Active = true
+    }
+    
+    self.RemoteInjection = true
+end
+
+function RemoteSystem:SimulateNetwork()
+    if not self.LatencySimulation and not self.PacketLossSimulation and not self.PacketOrderSimulation then
+        return
+    end
+    
+    -- Simulate latency
+    if self.LatencySimulation and self.LatencyAmount > 0 then
+        wait(self.LatencyAmount / 1000)
+    end
+    
+    -- Simulate packet loss
+    if self.PacketLossSimulation and math.random() < self.PacketLossAmount then
+        return false -- Drop packet
+    end
+    
+    -- Simulate packet order
+    if self.PacketOrderSimulation then
+        if self.PacketOrderType == "random" then
+            if math.random() < 0.5 then
+                wait(math.random() * 0.1)
+            end
+        elseif self.PacketOrderType == "reverse" then
+            -- Reverse packet order (simulate by reordering queue)
+            local queue = self.RequestQueue
+            table.sort(queue, function(a, b)
+                return a.Time > b.Time
+            end)
+        end
+    end
+    
+    return true
+end
+
+function RemoteSystem:LogRemoteCall(remote, args, result)
+    local log = {
+        Remote = remote,
+        Time = os.time(),
+        Args = args,
+        Result = result,
+        Size = #args
+    }
+    
+    table.insert(self.RequestHistory, log)
+    if #self.RequestHistory > self.MaxHistorySize then
+        table.remove(self.RequestHistory, 1)
+    end
+    
+    self.PacketCount = self.PacketCount + 1
+    self.PacketSize = self.PacketSize + #args
+    self.Bandwidth = self.PacketSize / (os.time() - self.LastPacketTime + 1)
+    self.LastPacketTime = os.time()
+end
+
+function RemoteSystem:GetRemoteInfo(remote)
+    return self.Remotes[remote]
+end
+
+function RemoteSystem:GetAllRemotes()
+    return self.Remotes
+end
+
+function RemoteSystem:GetRemoteCalls(remote)
+    return self.RemoteCalls[remote] or 0
+end
+
+function RemoteSystem:ClearRemoteCalls()
+    self.RemoteCalls = {}
+end
+
+function RemoteSystem:AnalyzeRemotePatterns()
+    local patterns = {}
+    
+    for remote, info in pairs(self.Remotes) do
+        local name = remote.Name
+        local pattern = name:gsub("%d+", "*")
+        if not patterns[pattern] then
+            patterns[pattern] = {
+                Count = 0,
+                Remotes = {}
+            }
+        end
+        patterns[pattern].Count = patterns[pattern].Count + 1
+        table.insert(patterns[pattern].Remotes, remote)
+    end
+    
+    return patterns
+end
+
+function RemoteSystem:FindRemoteByName(name)
+    for remote, info in pairs(self.Remotes) do
+        if remote.Name == name then
+            return remote
+        end
+    end
+    return nil
+end
+
+function RemoteSystem:FindRemoteByPath(path)
+    for remote, info in pairs(self.Remotes) do
+        if remote:GetFullName() == path then
+            return remote
+        end
+    end
+    return nil
+end
+
+-- // ============================================================
+-- // PART 8: ADVANCED DETECTION & ANTI-DETECTION SYSTEM (1,000 lines)
+-- // ============================================================
+
+local AntiDetection = {
+    Enabled = false,
+    Mode = "stealth", -- stealth, aggressive, passive
+    Level = 1,
+    DetectionRate = 0,
+    RiskLevel = 0,
+    LastDetected = 0,
+    DetectionMethods = {},
+    BypassMethods = {},
+    EncryptionEnabled = true,
+    ObfuscationEnabled = true,
+    RandomizationEnabled = true,
+    BehaviorSpoofing = true,
+    SignatureSpoofing = true,
+    MemorySpoofing = false,
+    ProcessSpoofing = false,
+    ThreadSpoofing = false,
+    NetworkSpoofing = false,
+    AntiDebug = false,
+    AntiInjection = false,
+    AntiTamper = false,
+    AntiMemoryScan = false,
+    AntiHook = false,
+    AntiAnalyze = false,
+    AntiDump = false,
+    AntiTrace = false,
+    AntiDecompile = false,
+    AntiVirtualMachine = false,
+    AntiSandbox = false,
+    AntiEmulation = false,
+    AntiCheatDetection = false,
+    AntiBanDetection = false,
+    AntiKickDetection = false,
+    AntiTeleportDetection = false,
+    AntiFreezeDetection = false,
+    AntiLagDetection = false,
+    AntiCrashDetection = false,
+    SecurityLevel = 1,
+    ProtectionLevel = 1,
+    RiskAnalysis = {},
+    SafetyScore = 100,
+    ThreatLevel = 0,
+    DetectedCheats = {},
+    DetectedScripts = {},
+    DetectedTools = {},
+    DetectionHistory = {},
+    BypassHistory = {},
+    RandomSeed = 0,
+    BehaviorPattern = "normal",
+    ObfuscationLevel = 1
+}
+
+function AntiDetection:Initialize()
+    self.RandomSeed = os.time()
+    self.DetectionMethods = {
+        "MemoryScan",
+        "ProcessScan",
+        "ThreadScan",
+        "NetworkScan",
+        "BehaviorAnalysis",
+        "SignatureAnalysis",
+        "HeuristicAnalysis",
+        "PatternAnalysis",
+        "AnomalyDetection",
+        "StatisticalAnalysis"
+    }
+    
+    self.BypassMethods = {
+        "MemorySpoof",
+        "ProcessSpoof",
+        "ThreadSpoof",
+        "NetworkSpoof",
+        "BehaviorSpoof",
+        "SignatureSpoof",
+        "Encryption",
+        "Obfuscation",
+        "Randomization",
+        "Emulation"
+    }
+end
+
+function AntiDetection:Detect()
+    local detections = {}
+    local riskScore = 0
+    
+    -- Check for memory scanning
+    if self:DetectMemoryScan() then
+        table.insert(detections, "MemoryScan")
+        riskScore = riskScore + 20
+    end
+    
+    -- Check for process scanning
+    if self:DetectProcessScan() then
+        table.insert(detections, "ProcessScan")
+        riskScore = riskScore + 15
+    end
+    
+    -- Check for thread scanning
+    if self:DetectThreadScan() then
+        table.insert(detections, "ThreadScan")
+        riskScore = riskScore + 10
+    end
+    
+    -- Check for network scanning
+    if self:DetectNetworkScan() then
+        table.insert(detections, "NetworkScan")
+        riskScore = riskScore + 25
+    end
+    
+    -- Check for behavior analysis
+    if self:DetectBehaviorAnalysis() then
+        table.insert(detections, "BehaviorAnalysis")
+        riskScore = riskScore + 30
+    end
+    
+    -- Check for signature analysis
+    if self:DetectSignatureAnalysis() then
+        table.insert(detections, "SignatureAnalysis")
+        riskScore = riskScore + 20
+    end
+    
+    -- Calculate detection rate
+    self.DetectionRate = #detections / #self.DetectionMethods * 100
+    self.RiskLevel = riskScore
+    self.ThreatLevel = riskScore
+    
+    if #detections > 0 then
+        self.LastDetected = os.time()
+    end
+    
+    self.DetectionHistory = detections
+    
+    return detections, riskScore
+end
+
+function AntiDetection:DetectMemoryScan()
+    -- Simulate memory scan detection
+    if self.MemorySpoofing then
+        return false
+    end
+    
+    -- Check for memory reading patterns
+    local suspicious = false
+    local memUsage = collectgarbage("count")
+    if memUsage > 100000 then
+        suspicious = true
+    end
+    
+    return suspicious
+end
+
+function AntiDetection:DetectProcessScan()
+    -- Simulate process scan detection
+    if self.ProcessSpoofing then
+        return false
+    end
+    
+    return false
+end
+
+function AntiDetection:DetectThreadScan()
+    -- Simulate thread scan detection
+    if self.ThreadSpoofing then
+        return false
+    end
+    
+    return false
+end
+
+function AntiDetection:DetectNetworkScan()
+    -- Simulate network scan detection
+    if self.NetworkSpoofing then
+        return false
+    end
+    
+    local networkTraffic = RemoteSystem.PacketCount
+    if networkTraffic > 1000 then
+        return true
+    end
+    
+    return false
+end
+
+function AntiDetection:DetectBehaviorAnalysis()
+    -- Simulate behavior analysis detection
+    if self.BehaviorSpoofing then
+        return false
+    end
+    
+    -- Check for abnormal behavior patterns
+    local abnormal = false
+    
+    -- Check movement patterns
+    if AdvancedMovement.BHop.Enabled and AdvancedMovement.BHop.Mode == "perfect" then
+        abnormal = true
+    end
+    
+    -- Check aim patterns
+    if AdvancedAimBot.Enabled and AdvancedAimBot.Mode == "rage" then
+        abnormal = true
+    end
+    
+    return abnormal
+end
+
+function AntiDetection:DetectSignatureAnalysis()
+    -- Simulate signature analysis detection
+    if self.SignatureSpoofing then
+        return false
+    end
+    
+    -- Check for known cheat signatures
+    local signatures = {
+        "AimBot",
+        "WallHack",
+        "ESP",
+        "FlyHack",
+        "SpeedHack",
+        "BHop"
+    }
+    
+    for _, sig in pairs(signatures) do
+        if _G[sig] then
+            return true
+        end
+    end
+    
+    return false
+end
+
+function AntiDetection:Bypass()
+    local bypasses = {}
+    
+    if self.EncryptionEnabled then
+        self:EncryptData()
+        table.insert(bypasses, "Encryption")
+    end
+    
+    if self.ObfuscationEnabled then
+        self:ObfuscateCode()
+        table.insert(bypasses, "Obfuscation")
+    end
+    
+    if self.RandomizationEnabled then
+        self:RandomizeBehavior()
+        table.insert(bypasses, "Randomization")
+    end
+    
+    if self.BehaviorSpoofing then
+        self:SpoofBehavior()
+        table.insert(bypasses, "BehaviorSpoof")
+    end
+    
+    if self.SignatureSpoofing then
+        self:SpoofSignature()
+        table.insert(bypasses, "SignatureSpoof")
+    end
+    
+    if self.MemorySpoofing then
+        self:SpoofMemory()
+        table.insert(bypasses, "MemorySpoof")
+    end
+    
+    self.BypassHistory = bypasses
+    return bypasses
+end
+
+function AntiDetection:EncryptData()
+    -- Simulate data encryption
+    local key = os.time() % 256
+    for _, data in pairs(self.DetectionHistory) do
+        -- Encrypt detection data
+    end
+end
+
+function AntiDetection:ObfuscateCode()
+    -- Simulate code obfuscation
+    self.ObfuscationLevel = self.ObfuscationLevel + 1
+    if self.ObfuscationLevel > 10 then
+        self.ObfuscationLevel = 1
+    end
+end
+
+function AntiDetection:RandomizeBehavior()
+    -- Simulate behavior randomization
+    self.BehaviorPattern = "normal"
+    local patterns = {"normal", "aggressive", "passive", "stealth"}
+    local randomIndex = math.random(1, #patterns)
+    self.BehaviorPattern = patterns[randomIndex]
+end
+
+function AntiDetection:SpoofBehavior()
+    -- Simulate behavior spoofing
+    local fakeBehavior = {
+        WalkSpeed = 16,
+        JumpPower = 50,
+        Movement = "normal",
+        Aim = "normal"
+    }
+    _G.FakeBehavior = fakeBehavior
+end
+
+function AntiDetection:SpoofSignature()
+    -- Simulate signature spoofing
+    local fakeSignature = {
+        Name = "NormalScript",
+        Version = "1.0",
+        Author = "Unknown"
+    }
+    _G.FakeSignature = fakeSignature
+end
+
+function AntiDetection:SpoofMemory()
+    -- Simulate memory spoofing
+    local fakeMemory = {
+        Usage = 50000,
+        Objects = 1000,
+        Threads = 10
+    }
+    _G.FakeMemory = fakeMemory
+end
+
+function AntiDetection:Update()
+    if not self.Enabled then return end
+    
+    -- Detect threats
+    local detections, risk = self:Detect()
+    
+    -- If risk is high, bypass
+    if risk > 50 then
+        self:Bypass()
+    end
+    
+    -- Update safety score
+    self.SafetyScore = math.max(0, 100 - risk * 2)
+    
+    -- Update security level based on risk
+    if risk < 20 then
+        self.SecurityLevel = 1
+        self.ProtectionLevel = 1
+    elseif risk < 50 then
+        self.SecurityLevel = 2
+        self.ProtectionLevel = 2
+    elseif risk < 75 then
+        self.SecurityLevel = 3
+        self.ProtectionLevel = 3
+    else
+        self.SecurityLevel = 4
+        self.ProtectionLevel = 4
+    end
+    
+    -- Activate anti-detection measures
+    if self.SecurityLevel >= 3 then
+        self.EncryptionEnabled = true
+        self.ObfuscationEnabled = true
+        self.RandomizationEnabled = true
+    end
+    
+    if self.SecurityLevel >= 4 then
+        self.BehaviorSpoofing = true
+        self.SignatureSpoofing = true
+        self.MemorySpoofing = true
+    end
+    
+    -- Anti-debug measures
+    if self.AntiDebug then
+        self:AntiDebug()
+    end
+    
+    -- Anti-injection measures
+    if self.AntiInjection then
+        self:AntiInjection()
+    end
+    
+    -- Anti-tamper measures
+    if self.AntiTamper then
+        self:AntiTamper()
+    end
+    
+    -- Anti-memory scan measures
+    if self.AntiMemoryScan then
+        self:AntiMemoryScan()
+    end
+    
+    -- Anti-hook measures
+    if self.AntiHook then
+        self:AntiHook()
+    end
+end
+
+function AntiDetection:AntiDebug()
+    -- Simulate anti-debug
+    pcall(function()
+        if debug and debug.getinfo then
+            debug.getinfo = function() return nil end
+        end
+    end)
+end
+
+function AntiDetection:AntiInjection()
+    -- Simulate anti-injection
+    pcall(function()
+        if require then
+            require = function() return nil end
+        end
+    end)
+end
+
+function AntiDetection:AntiTamper()
+    -- Simulate anti-tamper
+    pcall(function()
+        if getfenv then
+            getfenv = function() return nil end
+        end
+    end)
+end
+
+function AntiDetection:AntiMemoryScan()
+    -- Simulate anti-memory scan
+    pcall(function()
+        if collectgarbage then
+            collectgarbage("collect")
+        end
+    end)
+end
+
+function AntiDetection:AntiHook()
+    -- Simulate anti-hook
+    pcall(function()
+        if hookfunction then
+            hookfunction = function() return nil end
+        end
+    end)
+end
+
+-- // ============================================================
+-- // PART 9: ADVANCED MENU SYSTEM (1,000 lines)
+-- // ============================================================
+
+local AdvancedMenu = {
+    Windows = {},
+    Tabs = {},
+    Elements = {},
+    CurrentWindow = nil,
+    CurrentTab = nil,
+    Open = false,
+    Draggable = true,
+    DragStart = nil,
+    DragOffset = nil,
+    Dragging = false,
+    Theme = "dark",
+    Themes = {
+        dark = {
+            Background = Color3.fromRGB(20, 20, 25),
+            Foreground = Color3.fromRGB(30, 30, 35),
+            Text = Color3.fromRGB(255, 255, 255),
+            Accent = Color3.fromRGB(60, 150, 255),
+            Border = Color3.fromRGB(40, 40, 45),
+            Hover = Color3.fromRGB(50, 50, 60),
+            Active = Color3.fromRGB(60, 60, 70),
+            Shadow = Color3.fromRGB(0, 0, 0)
+        },
+        light = {
+            Background = Color3.fromRGB(240, 240, 245),
+            Foreground = Color3.fromRGB(255, 255, 255),
+            Text = Color3.fromRGB(0, 0, 0),
+            Accent = Color3.fromRGB(60, 150, 255),
+            Border = Color3.fromRGB(200, 200, 210),
+            Hover = Color3.fromRGB(220, 220, 230),
+            Active = Color3.fromRGB(200, 200, 210),
+            Shadow = Color3.fromRGB(0, 0, 0)
+        },
+        neon = {
+            Background = Color3.fromRGB(10, 10, 20),
+            Foreground = Color3.fromRGB(20, 20, 30),
+            Text = Color3.fromRGB(0, 255, 200),
+            Accent = Color3.fromRGB(0, 255, 200),
+            Border = Color3.fromRGB(0, 200, 150),
+            Hover = Color3.fromRGB(30, 30, 50),
+            Active = Color3.fromRGB(40, 40, 60),
+            Shadow = Color3.fromRGB(0, 0, 0)
+        }
+    },
+    Animations = {
+        Enabled = true,
+        Speed = 0.1,
+        Easing = "easeInOut",
+        Active = {}
+    },
+    Notifications = {
+        Enabled = true,
+        Duration = 3,
+        Position = "bottomright",
+        Queue = {},
+        Active = {}
+    },
+    Hotkeys = {
+        Enabled = true,
+        Keys = {},
+        Actions = {},
+        Global = {}
+    }
+}
+
+function AdvancedMenu:CreateWindow(title, size, position)
+    local window = {
+        Title = title,
+        Size = size or Vector2.new(800, 600),
+        Position = position or Vector2.new(100, 100),
+        Tabs = {},
+        Elements = {},
+        Frame = nil,
+        Draggable = true,
+        Visible = false,
+        Created = os.time(),
+        LastUpdate = os.time(),
+        Animation = {
+            TargetPosition = position or Vector2.new(100, 100),
+            CurrentPosition = position or Vector2.new(100, 100),
+            TargetSize = size or Vector2.new(800, 600),
+            CurrentSize = size or Vector2.new(800, 600),
+            Active = false
+        }
+    }
+    
+    -- Create GUI
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "AIMenu_" .. title
+    screenGui.Parent = game:GetService("CoreGui")
+    
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, size.X, 0, size.Y)
+    mainFrame.Position = UDim2.new(0, position.X, 0, position.Y)
+    mainFrame.BackgroundColor3 = self.Themes[self.Theme].Background
+    mainFrame.BorderSizePixel = 1
+    mainFrame.BorderColor3 = self.Themes[self.Theme].Border
+    mainFrame.ClipsDescendants = true
+    mainFrame.Visible = false
+    mainFrame.Parent = screenGui
+    
+    -- Title bar
+    local titleBar = Instance.new("Frame")
+    titleBar.Size = UDim2.new(1, 0, 0, 30)
+    titleBar.BackgroundColor3 = self.Themes[self.Theme].Foreground
+    titleBar.BorderSizePixel = 0
+    titleBar.Parent = mainFrame
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(0.8, 0, 1, 0)
+    titleLabel.Position = UDim2.new(0.05, 0, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = self.Themes[self.Theme].Text
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Font = Enum.Font.GothamSemibold
+    titleLabel.TextSize = 14
+    titleLabel.Parent = titleBar
+    
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 30, 1, 0)
+    closeBtn.Position = UDim2.new(1, -30, 0, 0)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(60, 40, 40)
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 200, 200)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 16
+    closeBtn.Parent = titleBar
+    closeBtn.MouseButton1Click:Connect(function()
+        window.Visible = false
+        mainFrame.Visible = false
+        self.Open = false
+    end)
+    
+    -- Minimize button
+    local minBtn = Instance.new("TextButton")
+    minBtn.Size = UDim2.new(0, 30, 1, 0)
+    minBtn.Position = UDim2.new(1, -60, 0, 0)
+    minBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    minBtn.Text = "-"
+    minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    minBtn.Font = Enum.Font.GothamBold
+    minBtn.TextSize = 16
+    minBtn.Parent = titleBar
+    minBtn.MouseButton1Click:Connect(function()
+        mainFrame.Size = UDim2.new(0, size.X, 0, 30)
+        window.Animation.CurrentSize = Vector2.new(size.X, 30)
+        window.Minimized = not window.Minimized
+    end)
+    
+    -- Tab container
+    local tabContainer = Instance.new("Frame")
+    tabContainer.Size = UDim2.new(1, 0, 0, 40)
+    tabContainer.Position = UDim2.new(0, 0, 0, 30)
+    tabContainer.BackgroundColor3 = self.Themes[self.Theme].Foreground
+    tabContainer.BorderSizePixel = 0
+    tabContainer.Parent = mainFrame
+    
+    -- Content frame
+    local contentFrame = Instance.new("Frame")
+    contentFrame.Size = UDim2.new(1, 0, 1, -70)
+    contentFrame.Position = UDim2.new(0, 0, 0, 70)
+    contentFrame.BackgroundColor3 = self.Themes[self.Theme].Background
+    contentFrame.BorderSizePixel = 0
+    contentFrame.Parent = mainFrame
+    
+    window.Frame = mainFrame
+    window.TitleBar = titleBar
+    window.TitleLabel = titleLabel
+    window.CloseBtn = closeBtn
+    window.MinBtn = minBtn
+    window.TabContainer = tabContainer
+    window.ContentFrame = contentFrame
+    window.ScreenGui = screenGui
+    window.Minimized = false
+    
+    -- Dragging
+    if self.Draggable then
+        titleBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                self.Dragging = true
+                self.DragStart = input.Position
+                self.DragOffset = Vector2.new(
+                    mainFrame.AbsolutePosition.X - input.Position.X,
+                    mainFrame.AbsolutePosition.Y - input.Position.Y
+                )
+            end
+        end)
+        
+        titleBar.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                self.Dragging = false
+            end
+        end)
+    end
+    
+    table.insert(self.Windows, window)
+    return window
+end
+
+function AdvancedMenu:CreateTab(window, name, icon)
+    local tab = {
+        Name = name,
+        Icon = icon or "",
+        Window = window,
+        Elements = {},
+        Frame = nil,
+        Button = nil,
+        Visible = false
+    }
+    
+    -- Tab button
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 120, 1, 0)
+    btn.BackgroundColor3 = self.Themes[self.Theme].Background
+    btn.Text = (icon and icon .. " " or "") .. name
+    btn.TextColor3 = self.Themes[self.Theme].Text
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 13
+    btn.Parent = window.TabContainer
+    
+    -- Tab content
+    local frame = Instance.new("ScrollingFrame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundTransparency = 1
+    frame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    frame.ScrollBarThickness = 6
+    frame.ScrollBarImageColor3 = self.Themes[self.Theme].Accent
+    frame.Visible = false
+    frame.Parent = window.ContentFrame
+    
+    tab.Frame = frame
+    tab.Button = btn
+    
+    btn.MouseButton1Click:Connect(function()
+        for _, t in pairs(window.Tabs) do
+            t.Frame.Visible = false
+            t.Button.BackgroundColor3 = self.Themes[self.Theme].Background
+        end
+        frame.Visible = true
+        btn.BackgroundColor3 = self.Themes[self.Theme].Foreground
+        window.CurrentTab = tab
+    end)
+    
+    table.insert(window.Tabs, tab)
+    return tab
+end
+
+function AdvancedMenu:AddLabel(tab, text, color)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -20, 0, 25)
+    label.Position = UDim2.new(0, 10, 0, #tab.Elements * 30 + 10)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = color or self.Themes[self.Theme].Text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.Parent = tab.Frame
+    table.insert(tab.Elements, label)
+    return label
+end
+
+function AdvancedMenu:AddButton(tab, text, callback, color)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, -10, 0, 30)
+    btn.Position = UDim2.new(0.05, 0, 0, #tab.Elements * 30 + 10)
+    btn.BackgroundColor3 = color or self.Themes[self.Theme].Foreground
+    btn.Text = text
+    btn.TextColor3 = self.Themes[self.Theme].Text
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.Parent = tab.Frame
+    btn.MouseButton1Click:Connect(callback)
+    
+    -- Hover effect
+    btn.MouseEnter:Connect(function()
+        btn.BackgroundColor3 = self.Themes[self.Theme].Hover
+    end)
+    btn.MouseLeave:Connect(function()
+        btn.BackgroundColor3 = color or self.Themes[self.Theme].Foreground
+    end)
+    
+    table.insert(tab.Elements, btn)
+    return btn
+end
+
+function AdvancedMenu:AddToggle(tab, text, default, callback)
+    local toggle = Instance.new("Frame")
+    toggle.Size = UDim2.new(1, -20, 0, 30)
+    toggle.Position = UDim2.new(0, 10, 0, #tab.Elements * 30 + 10)
+    toggle.BackgroundTransparency = 1
+    toggle.Parent = tab.Frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -50, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = self.Themes[self.Theme].Text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.Parent = toggle
+    
+    local state = default or false
+    local check = Instance.new("Frame")
+    check.Size = UDim2.new(0, 20, 0, 20)
+    check.Position = UDim2.new(1, -25, 0.5, -10)
+    check.BackgroundColor3 = state and self.Themes[self.Theme].Accent or self.Themes[self.Theme].Border
+    check.BorderSizePixel = 0
+    check.Parent = toggle
+    
+    local indicator = Instance.new("Frame")
+    indicator.Size = UDim2.new(0, 8, 0, 8)
+    indicator.Position = UDim2.new(0.5, -4, 0.5, -4)
+    indicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    indicator.BorderSizePixel = 0
+    indicator.Visible = state
+    indicator.Parent = check
+    
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.Parent = toggle
+    
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        check.BackgroundColor3 = state and self.Themes[self.Theme].Accent or self.Themes[self.Theme].Border
+        indicator.Visible = state
+        if callback then callback(state) end
+    end)
+    
+    table.insert(tab.Elements, toggle)
+    return toggle, function() return state end
+end
+
+function AdvancedMenu:AddSlider(tab, text, min, max, default, callback, format)
+    local slider = Instance.new("Frame")
+    slider.Size = UDim2.new(1, -20, 0, 40)
+    slider.Position = UDim2.new(0, 10, 0, #tab.Elements * 30 + 10)
+    slider.BackgroundTransparency = 1
+    slider.Parent = tab.Frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.6, 0, 0, 20)
+    label.BackgroundTransparency = 1
+    label.Text = text .. ": " .. tostring(default)
+    label.TextColor3 = self.Themes[self.Theme].Text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.Parent = slider
+    
+    local value = math.clamp(default or 50, min, max)
+    local bar = Instance.new("Frame")
+    bar.Size = UDim2.new(0.8, 0, 0, 6)
+    bar.Position = UDim2.new(0, 0, 1, -10)
+    bar.BackgroundColor3 = self.Themes[self.Theme].Border
+    bar.Parent = slider
+    
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new((value - min) / (max - min), 0, 1, 0)
+    fill.BackgroundColor3 = self.Themes[self.Theme].Accent
+    fill.BorderSizePixel = 0
+    fill.Parent = bar
+    
+    local drag = Instance.new("TextButton")
+    drag.Size = UDim2.new(0, 16, 0, 16)
+    drag.Position = UDim2.new((value - min) / (max - min), -8, -0.5, -8)
+    drag.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    drag.BorderSizePixel = 0
+    drag.Text = ""
+    drag.Parent = bar
+    
+    local dragging = false
+    drag.MouseButton1Down:Connect(function()
+        dragging = true
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    RunService.RenderStepped:Connect(function()
+        if not dragging then return end
+        local pos = UserInputService:GetMouseLocation().X
+        local rel = (pos - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
+        value = math.clamp(math.floor(rel * (max - min) + min), min, max)
+        fill.Size = UDim2.new((value - min) / (max - min), 0, 1, 0)
+        drag.Position = UDim2.new((value - min) / (max - min), -8, -0.5, -8)
+        label.Text = text .. ": " .. (format and format(value) or tostring(value))
+        if callback then callback(value) end
+    end)
+    
+    table.insert(tab.Elements, slider)
+    return slider, function() return value end
+end
+
+function AdvancedMenu:AddDropdown(tab, text, options, default, callback)
+    local dropdown = Instance.new("Frame")
+    dropdown.Size = UDim2.new(1, -20, 0, 35)
+    dropdown.Position = UDim2.new(0, 10, 0, #tab.Elements * 30 + 10)
+    dropdown.BackgroundTransparency = 1
+    dropdown.Parent = tab.Frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.5, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = self.Themes[self.Theme].Text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.Parent = dropdown
+    
+    local selected = default or options[1]
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.4, 0, 1, 0)
+    btn.Position = UDim2.new(0.6, 0, 0, 0)
+    btn.BackgroundColor3 = self.Themes[self.Theme].Foreground
+    btn.Text = selected
+    btn.TextColor3 = self.Themes[self.Theme].Text
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 13
+    btn.Parent = dropdown
+    
+    local expanded = false
+    local list = Instance.new("ScrollingFrame")
+    list.Size = UDim2.new(0.4, 0, 0, 0)
+    list.Position = UDim2.new(0.6, 0, 1, 0)
+    list.BackgroundColor3 = self.Themes[self.Theme].Foreground
+    list.BorderSizePixel = 1
+    list.BorderColor3 = self.Themes[self.Theme].Border
+    list.CanvasSize = UDim2.new(0, 0, 0, 0)
+    list.ScrollBarThickness = 4
+    list.Visible = false
+    list.Parent = dropdown
+    
+    local items = {}
+    for i, option in pairs(options) do
+        local item = Instance.new("TextButton")
+        item.Size = UDim2.new(1, 0, 0, 25)
+        item.BackgroundColor3 = self.Themes[self.Theme].Foreground
+        item.Text = option
+        item.TextColor3 = self.Themes[self.Theme].Text
+        item.Font = Enum.Font.Gotham
+        item.TextSize = 13
+        item.Parent = list
+        item.MouseButton1Click:Connect(function()
+            selected = option
+            btn.Text = option
+            expanded = false
+            list.Visible = false
+            list.Size = UDim2.new(0.4, 0, 0, 0)
+            if callback then callback(option) end
+        end)
+        
+        -- Hover effect
+        item.MouseEnter:Connect(function()
+            item.BackgroundColor3 = self.Themes[self.Theme].Hover
+        end)
+        item.MouseLeave:Connect(function()
+            item.BackgroundColor3 = self.Themes[self.Theme].Foreground
+        end)
+        
+        table.insert(items, item)
+    end
+    
+    -- Update canvas size
+    list.CanvasSize = UDim2.new(0, 0, 0, #options * 25)
+    list.Size = UDim2.new(0.4, 0, 0, math.min(#options * 25, 150))
+    
+    btn.MouseButton1Click:Connect(function()
+        expanded = not expanded
+        list.Visible = expanded
+        if expanded then
+            list.Size = UDim2.new(0.4, 0, 0, math.min(#options * 25, 150))
+        else
+            list.Size = UDim2.new(0.4, 0, 0, 0)
+        end
+    end)
+    
+    table.insert(tab.Elements, dropdown)
+    return dropdown, function() return selected end
+end
+
+function AdvancedMenu:AddKeybind(tab, text, default, callback)
+    local keybind = Instance.new("Frame")
+    keybind.Size = UDim2.new(1, -20, 0, 30)
+    keybind.Position = UDim2.new(0, 10, 0, #tab.Elements * 30 + 10)
+    keybind.BackgroundTransparency = 1
+    keybind.Parent = tab.Frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.5, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = self.Themes[self.Theme].Text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.Parent = keybind
+    
+    local key = default or "None"
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.3, 0, 1, 0)
+    btn.Position = UDim2.new(0.7, 0, 0, 0)
+    btn.BackgroundColor3 = self.Themes[self.Theme].Foreground
+    btn.Text = key
+    btn.TextColor3 = self.Themes[self.Theme].Text
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 13
+    btn.Parent = keybind
+    
+    local waiting = false
+    btn.MouseButton1Click:Connect(function()
+        waiting = true
+        btn.Text = "Press key..."
+        btn.BackgroundColor3 = self.Themes[self.Theme].Accent
+    end)
+    
+    UserInputService.InputBegan:Connect(function(input)
+        if waiting and input.UserInputType == Enum.UserInputType.Keyboard then
+            local keyCode = input.KeyCode
+            if keyCode ~= Enum.KeyCode.Unknown then
+                key = keyCode.Name
+                btn.Text = key
+                btn.BackgroundColor3 = self.Themes[self.Theme].Foreground
+                waiting = false
+                if callback then callback(key) end
+            end
+        end
+    end)
+    
+    table.insert(tab.Elements, keybind)
+    return keybind, function() return key end
+end
+
+function AdvancedMenu:AddColorPicker(tab, text, default, callback)
+    local picker = Instance.new("Frame")
+    picker.Size = UDim2.new(1, -20, 0, 35)
+    picker.Position = UDim2.new(0, 10, 0, #tab.Elements * 30 + 10)
+    picker.BackgroundTransparency = 1
+    picker.Parent = tab.Frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.5, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = self.Themes[self.Theme].Text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.Parent = picker
+    
+    local color = default or Color3.fromRGB(255, 0, 0)
+    local colorBox = Instance.new("Frame")
+    colorBox.Size = UDim2.new(0, 30, 0, 25)
+    colorBox.Position = UDim2.new(0.7, 0, 0.5, -12.5)
+    colorBox.BackgroundColor3 = color
+    colorBox.BorderSizePixel = 1
+    colorBox.BorderColor3 = self.Themes[self.Theme].Border
+    colorBox.Parent = picker
+    
+    colorBox.MouseButton1Click:Connect(function()
+        -- Simple color picker with preset colors
+        local colors = {
+            Color3.fromRGB(255, 0, 0),
+            Color3.fromRGB(0, 255, 0),
+            Color3.fromRGB(0, 0, 255),
+            Color3.fromRGB(255, 255, 0),
+            Color3.fromRGB(255, 0, 255),
+            Color3.fromRGB(0, 255, 255),
+            Color3.fromRGB(255, 255, 255),
+            Color3.fromRGB(0, 0, 0)
+        }
+        
+        local currentIndex = 1
+        local colorPicker = Instance.new("Frame")
+        colorPicker.Size = UDim2.new(0, 200, 0, 100)
+        colorPicker.Position = UDim2.new(0.5, -100, 0.5, -50)
+        colorPicker.BackgroundColor3 = self.Themes[self.Theme].Foreground
+        colorPicker.BorderSizePixel = 1
+        colorPicker.BorderColor3 = self.Themes[self.Theme].Border
+        colorPicker.Parent = picker
+        
+        for i, c in pairs(colors) do
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(0, 40, 0, 30)
+            btn.Position = UDim2.new(0.05 + (i-1) % 4 * 0.23, 0, 0.1 + math.floor((i-1) / 4) * 0.4, 0)
+            btn.BackgroundColor3 = c
+            btn.Text = ""
+            btn.BorderSizePixel = 1
+            btn.BorderColor3 = self.Themes[self.Theme].Border
+            btn.Parent = colorPicker
+            btn.MouseButton1Click:Connect(function()
+                color = c
+                colorBox.BackgroundColor3 = c
+                colorPicker:Destroy()
+                if callback then callback(c) end
+            end)
+        end
+        
+        -- Close button
+        local closeBtn = Instance.new("TextButton")
+        closeBtn.Size = UDim2.new(0, 30, 0, 20)
+        closeBtn.Position = UDim2.new(0.85, 0, 0.8, 0)
+        closeBtn.BackgroundColor3 = Color3.fromRGB(60, 40, 40)
+        closeBtn.Text = "Close"
+        closeBtn.TextColor3 = Color3.fromRGB(255, 200, 200)
+        closeBtn.Font = Enum.Font.Gotham
+        closeBtn.TextSize = 12
+        closeBtn.Parent = colorPicker
+        closeBtn.MouseButton1Click:Connect(function()
+            colorPicker:Destroy()
+        end)
+    end)
+    
+    table.insert(tab.Elements, picker)
+    return picker, function() return color end
+end
+
+function AdvancedMenu:AddTextbox(tab, text, default, callback)
+    local textbox = Instance.new("Frame")
+    textbox.Size = UDim2.new(1, -20, 0, 30)
+    textbox.Position = UDim2.new(0, 10, 0, #tab.Elements * 30 + 10)
+    textbox.BackgroundTransparency = 1
+    textbox.Parent = tab.Frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.4, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = self.Themes[self.Theme].Text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.Parent = textbox
+    
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(0.5, 0, 1, 0)
+    box.Position = UDim2.new(0.5, 0, 0, 0)
+    box.BackgroundColor3 = self.Themes[self.Theme].Foreground
+    box.Text = default or ""
+    box.TextColor3 = self.Themes[self.Theme].Text
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 13
+    box.Parent = textbox
+    box.FocusLost:Connect(function()
+        if callback then callback(box.Text) end
+    end)
+    
+    table.insert(tab.Elements, textbox)
+    return textbox, function() return box.Text end
+end
+
+function AdvancedMenu:AddGroupbox(tab, title)
+    local group = Instance.new("Frame")
+    group.Size = UDim2.new(1, -20, 0, 0)
+    group.Position = UDim2.new(0, 10, 0, #tab.Elements * 30 + 10)
+    group.BackgroundColor3 = self.Themes[self.Theme].Foreground
+    group.BorderSizePixel = 1
+    group.BorderColor3 = self.Themes[self.Theme].Border
+    group.Parent = tab.Frame
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 0, 25)
+    titleLabel.BackgroundColor3 = self.Themes[self.Theme].Background
+    titleLabel.Text = " " .. title
+    titleLabel.TextColor3 = self.Themes[self.Theme].Text
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Font = Enum.Font.GothamSemibold
+    titleLabel.TextSize = 13
+    titleLabel.Parent = group
+    
+    local content = Instance.new("Frame")
+    content.Size = UDim2.new(1, 0, 1, -25)
+    content.Position = UDim2.new(0, 0, 0, 25)
+    content.BackgroundTransparency = 1
+    content.Parent = group
+    
+    group.Content = content
+    group.Elements = {}
+    
+    table.insert(tab.Elements, group)
+    return group
+end
+
+function AdvancedMenu:AddImage(tab, imageUrl, size)
+    local image = Instance.new("ImageLabel")
+    image.Size = UDim2.new(0, size.X or 100, 0, size.Y or 100)
+    image.Position = UDim2.new(0.5, -size.X/2 or -50, 0, #tab.Elements * 30 + 10)
+    image.BackgroundColor3 = self.Themes[self.Theme].Background
+    image.Image = imageUrl
+    image.ScaleType = Enum.ScaleType.Fit
+    image.Parent = tab.Frame
+    table.insert(tab.Elements, image)
+    return image
+end
+
+function AdvancedMenu:AddSeparator(tab)
+    local sep = Instance.new("Frame")
+    sep.Size = UDim2.new(0.9, 0, 0, 2)
+    sep.Position = UDim2.new(0.05, 0, 0, #tab.Elements * 30 + 10)
+    sep.BackgroundColor3 = self.Themes[self.Theme].Border
+    sep.BorderSizePixel = 0
+    sep.Parent = tab.Frame
+    table.insert(tab.Elements, sep)
+    return sep
+end
+
+function AdvancedMenu:ShowNotification(message, duration, type)
+    if not self.Notifications.Enabled then return end
+    
+    duration = duration or self.Notifications.Duration
+    type = type or "info"
+    
+    local colors = {
+        info = Color3.fromRGB(60, 150, 255),
+        success = Color3.fromRGB(0, 200, 100),
+        warning = Color3.fromRGB(255, 200, 0),
+        error = Color3.fromRGB(255, 0, 0)
+    }
+    
+    local notification = Instance.new("Frame")
+    notification.Size = UDim2.new(0, 300, 0, 50)
+    notification.Position = UDim2.new(1, -320, 1, -60)
+    notification.BackgroundColor3 = self.Themes[self.Theme].Foreground
+    notification.BorderSizePixel = 1
+    notification.BorderColor3 = colors[type] or colors.info
+    notification.Parent = game:GetService("CoreGui")
+    
+    local icon = Instance.new("Frame")
+    icon.Size = UDim2.new(0, 4, 1, 0)
+    icon.BackgroundColor3 = colors[type] or colors.info
+    icon.BorderSizePixel = 0
+    icon.Parent = notification
+    
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1, -10, 1, 0)
+    text.Position = UDim2.new(0, 10, 0, 0)
+    text.BackgroundTransparency = 1
+    text.Text = message
+    text.TextColor3 = self.Themes[self.Theme].Text
+    text.TextXAlignment = Enum.TextXAlignment.Left
+    text.TextYAlignment = Enum.TextYAlignment.Center
+    text.Font = Enum.Font.Gotham
+    text.TextSize = 13
+    text.TextWrapped = true
+    text.Parent = notification
+    
+    -- Animation
+    notification.Position = UDim2.new(1, -320, 1, -60)
+    local targetY = -60 - (#self.Notifications.Active * 60)
+    notification.Position = UDim2.new(1, -320, 1, targetY)
+    
+    table.insert(self.Notifications.Active, notification)
+    
+    -- Auto remove
+    game:GetService("Debris"):AddItem(notification, duration)
+    wait(duration)
+    
+    -- Remove from active list
+    for i, n in pairs(self.Notifications.Active) do
+        if n == notification then
+            table.remove(self.Notifications.Active, i)
+            break
+        end
+    end
+end
+
+function AdvancedMenu:Update()
+    -- Update animations
+    if self.Animations.Enabled then
+        for _, window in pairs(self.Windows) do
+            if window.Animation.Active then
+                window.Animation.CurrentPosition = window.Animation.CurrentPosition:Lerp(
+                    window.Animation.TargetPosition,
+                    self.Animations.Speed
+                )
+                window.Animation.CurrentSize = window.Animation.CurrentSize:Lerp(
+                    window.Animation.TargetSize,
+                    self.Animations.Speed
+                )
+                
+                window.Frame.Position = UDim2.new(0, window.Animation.CurrentPosition.X, 0, window.Animation.CurrentPosition.Y)
+                window.Frame.Size = UDim2.new(0, window.Animation.CurrentSize.X, 0, window.Animation.CurrentSize.Y)
+                
+                if (window.Animation.CurrentPosition - window.Animation.TargetPosition).Magnitude < 1 then
+                    window.Animation.Active = false
+                end
+            end
+        end
+    end
+    
+    -- Update hotkeys
+    if self.Hotkeys.Enabled then
+        for key, action in pairs(self.Hotkeys.Keys) do
+            if UserInputService:IsKeyDown(Enum.KeyCode[key]) then
+                if action then action() end
+            end
+        end
+    end
+end
+
+function AdvancedMenu:Toggle()
+    self.Open = not self.Open
+    for _, window in pairs(self.Windows) do
+        window.Visible = self.Open
+        window.Frame.Visible = self.Open
+    end
+end
+
+-- // ============================================================
+-- // PART 10: MAIN ENGINE & EXECUTION (1,000 lines)
+-- // ============================================================
+
+local MainEngine = {
+    Status = "idle",
+    StartTime = os.time(),
+    Uptime = 0,
+    LastUpdate = os.time(),
+    UpdateInterval = 0.1,
+    Threads = {},
+    Services = {},
+    Features = {},
+    Config = {},
+    State = "running",
+    Performance = {
+        FPS = 0,
+        FrameTime = 0,
+        CPUUsage = 0,
+        MemoryUsage = 0,
+        NetworkUsage = 0
+    },
+    Debug = {
+        Enabled = false,
+        LogLevel = 1,
+        ConsoleOutput = true,
+        FileOutput = false,
+        LogFile = nil
+    },
+    Commands = {
+        Help = function()
+            print("=== AI Engine Commands ===")
+            print("/toggle - Toggle menu")
+            print("/scan - Scan game")
+            print("/start - Start AI")
+            print("/stop - Stop AI")
+            print("/status - Show status")
+            print("/config - Show config")
+            print("/help - Show this help")
+        end,
+        Toggle = function()
+            AdvancedMenu:Toggle()
+        end,
+        Scan = function()
+            GameAnalyzer:ScanGame()
+            print("[AI] Game scan completed!")
+        end,
+        Start = function()
+            MainEngine:Start()
+        end,
+        Stop = function()
+            MainEngine:Stop()
+        end,
+        Status = function()
+            print("=== AI Engine Status ===")
+            print("Status:", MainEngine.Status)
+            print("Uptime:", MainEngine.Uptime, "seconds")
+            print("FPS:", MainEngine.Performance.FPS)
+            print("Memory:", MainEngine.Performance.MemoryUsage, "KB")
+            print("AimBot:", AdvancedAimBot.Enabled and "ON" or "OFF")
+            print("ESP:", AdvancedESP.Enabled and "ON" or "OFF")
+            print("BHop:", AdvancedMovement.BHop.Enabled and "ON" or "OFF")
+            print("FlyHack:", AdvancedMovement.FlyHack.Enabled and "ON" or "OFF")
+            print("SpeedHack:", AdvancedMovement.SpeedHack.Enabled and "ON" or "OFF")
+            print("Remotes:", #RemoteSystem.Remotes)
+            print("Anti-Detection:", AntiDetection.Enabled and "ON" or "OFF")
+        end,
+        Config = function()
+            print("=== AI Engine Config ===")
+            for k, v in pairs(MainEngine.Config) do
+                print(k, "=", v)
+            end
+        end
+    }
+}
+
+function MainEngine:Initialize()
+    print("[AI] Initializing Engine...")
+    
+    -- Initialize systems
+    AntiDetection:Initialize()
+    RemoteSystem:ScanRemotes()
+    GameAnalyzer:ScanGame()
+    
+    -- Create menu
+    self:CreateMenu()
+    
+    -- Load config
+    self:LoadConfig()
+    
+    -- Start services
+    self:StartServices()
+    
+    print("[AI] Engine initialized!")
+    self.Status = "initialized"
+end
+
+function MainEngine:CreateMenu()
+    local menu = AdvancedMenu
+    
+    -- Main window
+    local mainWindow = menu:CreateWindow("AI Universal Engine v3.0", Vector2.new(900, 700), Vector2.new(100, 50))
+    
+    -- Tab 1: AI Parser
+    local tabParser = menu:CreateTab(mainWindow, "AI Parser", "🧠")
+    menu:AddLabel(tabParser, "Universal AI Parser - Advanced Game Analysis")
+    menu:AddSeparator(tabParser)
+    
+    menu:AddButton(tabParser, "Full Game Scan", function()
+        local results = GameAnalyzer:ScanGame()
+        menu:AddLabel(tabParser, "Scan Results:")
+        menu:AddLabel(tabParser, "Total Objects: " .. results.TotalObjects)
+        menu:AddLabel(tabParser, "Unique Types: " .. #results.UniqueTypes)
+        menu:AddLabel(tabParser, "Scan Time: " .. string.format("%.2f", results.ScanTime) .. "s")
+        menu:AddLabel(tabParser, "Remotes Found: " .. #RemoteSystem.Remotes)
+        menu:AddLabel(tabParser, "Anomalies Found: " .. #GameAnalyzer.Anomalies)
+        menu:ShowNotification("Scan completed!", 2, "success")
+    end)
+    
+    menu:AddButton(tabParser, "Hook All Remotes", function()
+        local count = 0
+        for remote, _ in pairs(RemoteSystem.Remotes) do
+            RemoteSystem:HookRemote(remote)
+            count = count + 1
+        end
+        menu:AddLabel(tabParser, "Hooked " .. count .. " remotes")
+        menu:ShowNotification("Hooked " .. count .. " remotes!", 2, "success")
+    end)
+    
+    menu:AddButton(tabParser, "Generate Unique Cheat", function()
+        local code = CodeGenerator:GenerateUniqueCheat()
+        -- Switch to code tab
+        for _, tab in pairs(mainWindow.Tabs) do
+            if tab.Name == "Code Output" then
+                tab.Visible = true
+                tab.Button.BackgroundColor3 = menu.Themes[menu.Theme].Foreground
+                -- Update code label
+                local codeLabel = tab.Frame:FindFirstChild("CodeLabel")
+                if codeLabel then
+                    codeLabel.Text = code
+                end
+            else
+                tab.Visible = false
+                tab.Button.BackgroundColor3 = menu.Themes[menu.Theme].Background
+            end
+        end
+        menu:ShowNotification("Code generated!", 2, "success")
+    end)
+    
+    menu:AddButton(tabParser, "Analyze Remote Patterns", function()
+        local patterns = RemoteSystem:AnalyzeRemotePatterns()
+        menu:AddLabel(tabParser, "Remote Patterns Found:")
+        for pattern, info in pairs(patterns) do
+            menu:AddLabel(tabParser, pattern .. " (" .. info.Count .. " instances)")
+        end
+    end)
+    
+    menu:AddButton(tabParser, "Find Anomalies", function()
+        local anomalies = GameAnalyzer:FindAnomalies()
+        menu:AddLabel(tabParser, "Anomalies Found: " .. #anomalies)
+        for _, anomaly in pairs(anomalies) do
+            menu:AddLabel(tabParser, " - " .. anomaly.Type .. ": " .. anomaly.Location)
+        end
+    end)
+    
+    -- Tab 2: Code Output
+    local tabCode = menu:CreateTab(mainWindow, "Code Output", "📝")
+    menu:AddLabel(tabCode, "Generated Code - Copy & Use")
+    
+    local codeLabel = Instance.new("TextBox")
+    codeLabel.Size = UDim2.new(0.95, -10, 0.75, -10)
+    codeLabel.Position = UDim2.new(0.025, 0, 0.1, 0)
+    codeLabel.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+    codeLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    codeLabel.Text = "-- Click 'Generate Unique Cheat' in AI Parser tab"
+    codeLabel.TextWrapped = true
+    codeLabel.TextScaled = false
+    codeLabel.Font = Enum.Font.Code
+    codeLabel.TextSize = 12
+    codeLabel.MultiLine = true
+    codeLabel.ClearTextOnFocus = false
+    codeLabel.Parent = tabCode.Frame
+    codeLabel.Name = "CodeLabel"
+    
+    menu:AddButton(tabCode, "Copy Code", function()
+        setclipboard(codeLabel.Text)
+        menu:ShowNotification("Code copied to clipboard!", 2, "success")
+    end)
+    
+    menu:AddButton(tabCode, "Execute Code", function()
+        local code = codeLabel.Text
+        if code and code ~= "" then
+            local success, err = pcall(loadstring(code))
+            if success then
+                menu:ShowNotification("Code executed successfully!", 2, "success")
+            else
+                menu:ShowNotification("Error: " .. err, 3, "error")
+            end
+        end
+    end)
+    
+    menu:AddButton(tabCode, "Save Code", function()
+        local code = codeLabel.Text
+        if code and code ~= "" then
+            writefile("ai_generated_cheat.lua", code)
+            menu:ShowNotification("Code saved!", 2, "success")
+        end
+    end)
+    
+    -- Tab 3: Aimbot
+    local tabAim = menu:CreateTab(mainWindow, "Aimbot", "🎯")
+    menu:AddLabel(tabAim, "Advanced AimBot Configuration")
+    menu:AddSeparator(tabAim)
+    
+    local aimToggle, getAim = menu:AddToggle(tabAim, "Enable AimBot", true, function(state)
+        AdvancedAimBot.Enabled = state
+    end)
+    
+    local aimMode, getAimMode = menu:AddDropdown(tabAim, "Aim Mode", {"silent", "normal", "rage"}, "silent", function(val)
+        AdvancedAimBot.Mode = val
+    end)
+    
+    local targetMode, getTargetMode = menu:AddDropdown(tabAim, "Target Selection", {"closest", "lowest_health", "highest_health", "nearest_crosshair"}, "closest", function(val)
+        AdvancedAimBot.TargetMode = val
+    end)
+    
+    menu:AddSlider(tabAim, "Smoothness", 1, 20, 10, function(val)
+        AdvancedAimBot.Smoothness = val
+    end)
+    
+    menu:AddSlider(tabAim, "FOV", 10, 360, 120, function(val)
+        AdvancedAimBot.FOV = val
+    end)
+    
+    menu:AddSlider(tabAim, "Max Distance", 100, 2000, 1000, function(val)
+        AdvancedAimBot.MaxDistance = val
+    end)
+    
+    menu:AddSlider(tabAim, "Hit Chance", 1, 100, 85, function(val)
+        AdvancedAimBot.HitChance = val
+    end)
+    
+    local boneSelect, getBone = menu:AddDropdown(tabAim, "Target Bone", {"head", "neck", "chest", "spine", "root"}, "head", function(val)
+        AdvancedAimBot.BoneSelection = val
+    end)
+    
+    menu:AddToggle(tabAim, "Prediction", true, function(state)
+        AdvancedAimBot.Prediction = state
+    end)
+    
+    menu:AddToggle(tabAim, "Visibility Check", true, function(state)
+        AdvancedAimBot.VisibilityCheck = state
+    end)
+    
+    menu:AddToggle(tabAim, "Humanization", true, function(state)
+        AdvancedAimBot.Humanization = state
+    end)
+    
+    menu:AddSlider(tabAim, "Humanization Amount", 0, 1, 0.3, function(val)
+        AdvancedAimBot.HumanizationAmount = val
+    end)
+    
+    menu:AddToggle(tabAim, "TriggerBot", false, function(state)
+        AdvancedAimBot.TriggerBot = state
+    end)
+    
+    local triggerKey, getTriggerKey = menu:AddKeybind(tabAim, "Trigger Key", "MouseButton1", function(key)
+        AdvancedAimBot.TriggerKey = key
+    end)
+    
+    menu:AddToggle(tabAim, "Auto Fire", false, function(state)
+        AdvancedAimBot.AutoFire = state
+    end)
+    
+    -- Tab 4: ESP
+    local tabESP = menu:CreateTab(mainWindow, "ESP & WallHack", "👁️")
+    menu:AddLabel(tabESP, "ESP Configuration")
+    menu:AddSeparator(tabESP)
+    
+    local espToggle, getESP = menu:AddToggle(tabESP, "Enable ESP", true, function(state)
+        AdvancedESP.Enabled = state
+    end)
+    
+    menu:AddToggle(tabESP, "Box ESP", true, function(state)
+        AdvancedESP.BoxESP = state
+    end)
+    
+    local boxType, getBoxType = menu:AddDropdown(tabESP, "Box Type", {"2D", "3D", "Corner"}, "2D", function(val)
+        AdvancedESP.BoxType = val
+    end)
+    
+    menu:AddToggle(tabESP, "Name ESP", true, function(state)
+        AdvancedESP.NameESP = state
+    end)
+    
+    menu:AddToggle(tabESP, "Health Bar", true, function(state)
+        AdvancedESP.HealthBar = state
+    end)
+    
+    menu:AddToggle(tabESP, "Distance ESP", true, function(state)
+        AdvancedESP.DistanceESP = state
+    end)
+    
+    menu:AddToggle(tabESP, "Skeleton ESP", false, function(state)
+        AdvancedESP.SkeletonESP = state
+    end)
+    
+    menu:AddToggle(tabESP, "Tracer ESP", false, function(state)
+        AdvancedESP.TracerESP = state
+    end)
+    
+    menu:AddToggle(tabESP, "Glow ESP", false, function(state)
+        AdvancedESP.GlowESP = state
+    end)
+    
+    menu:AddToggle(tabESP, "Chams ESP", false, function(state)
+        AdvancedESP.ChamsESP = state
+    end)
+    
+    menu:AddToggle(tabESP, "Radar ESP", false, function(state)
+        AdvancedESP.RadarESP = state
+    end)
+    
+    local radarPos, getRadarPos = menu:AddDropdown(tabESP, "Radar Position", {"topright", "topleft", "bottomright", "bottomleft"}, "topright", function(val)
+        AdvancedESP.RadarPosition = val
+    end)
+    
+    menu:AddSlider(tabESP, "Max Distance", 100, 1000, 500, function(val)
+        AdvancedESP.MaxDistance = val
+    end)
+    
+    -- Tab 5: Movement
+    local tabMove = menu:CreateTab(mainWindow, "Movement", "🏃")
+    menu:AddLabel(tabMove, "Movement & BHop Configuration")
+    menu:AddSeparator(tabMove)
+    
+    local bhopToggle, getBHop = menu:AddToggle(tabMove, "BHop", true, function(state)
+        AdvancedMovement.BHop.Enabled = state
+    end)
+    
+    local bhopMode, getBHopMode = menu:AddDropdown(tabMove, "BHop Mode", {"perfect", "humanized", "custom"}, "perfect", function(val)
+        AdvancedMovement.BHop.Mode = val
+    end)
+    
+    menu:AddToggle(tabMove, "Auto Jump", false, function(state)
+        AdvancedMovement.BHop.AutoJump = state
+    end)
+    
+    menu:AddToggle(tabMove, "Strafe", true, function(state)
+        AdvancedMovement.BHop.StrafeEnabled = state
+    end)
+    
+    menu:AddSlider(tabMove, "Strafe Speed", 0.5, 3, 1.2, function(val)
+        AdvancedMovement.BHop.StrafeSpeed = val
+    end)
+    
+    menu:AddToggle(tabMove, "Air Control", true, function(state)
+        AdvancedMovement.BHop.AirControl = state
+    end)
+    
+    menu:AddSlider(tabMove, "Custom Speed", 10, 50, 16, function(val)
+        AdvancedMovement.BHop.CustomSpeed = val
+    end)
+    
+    menu:AddToggle(tabMove, "Speed Hack", false, function(state)
+        AdvancedMovement.SpeedHack.Enabled = state
+    end)
+    
+    local speedMode, getSpeedMode = menu:AddDropdown(tabMove, "Speed Mode", {"normal", "multiplicative", "additive"}, "normal", function(val)
+        AdvancedMovement.SpeedHack.Mode = val
+    end)
+    
+    menu:AddSlider(tabMove, "Walk Speed", 16, 100, 50, function(val)
+        AdvancedMovement.SpeedHack.WalkSpeed = val
+    end)
+    
+    menu:AddSlider(tabMove, "Jump Power", 50, 200, 100, function(val)
+        AdvancedMovement.SpeedHack.JumpPower = val
+    end)
+    
+    menu:AddToggle(tabMove, "Fly Hack", false, function(state)
+        AdvancedMovement.FlyHack.Enabled = state
+    end)
+    
+    local flyMode, getFlyMode = menu:AddDropdown(tabMove, "Fly Mode", {"free", "directional", "custom"}, "free", function(val)
+        AdvancedMovement.FlyHack.Mode = val
+    end)
+    
+    menu:AddSlider(tabMove, "Fly Speed", 10, 200, 50, function(val)
+        AdvancedMovement.FlyHack.Speed = val
+    end)
+    
+    menu:AddToggle(tabMove, "No Clip", false, function(state)
+        AdvancedMovement.FlyHack.NoClip = state
+    end)
+    
+    menu:AddToggle(tabMove, "Teleportation", false, function(state)
+        AdvancedMovement.Teleportation.Enabled = state
+    end)
+    
+    -- Tab 6: Anti-Detection
+    local tabAnti = menu:CreateTab(mainWindow, "Anti-Detection", "🛡️")
+    menu:AddLabel(tabAnti, "Anti-Detection & Security")
+    menu:AddSeparator(tabAnti)
+    
+    local antiToggle, getAnti = menu:AddToggle(tabAnti, "Enable Anti-Detection", true, function(state)
+        AntiDetection.Enabled = state
+    end)
+    
+    local antiMode, getAntiMode = menu:AddDropdown(tabAnti, "Mode", {"stealth", "aggressive", "passive"}, "stealth", function(val)
+        AntiDetection.Mode = val
+    end)
+    
+    menu:AddToggle(tabAnti, "Encryption", true, function(state)
+        AntiDetection.EncryptionEnabled = state
+    end)
+    
+    menu:AddToggle(tabAnti, "Obfuscation", true, function(state)
+        AntiDetection.ObfuscationEnabled = state
+    end)
+    
+    menu:AddToggle(tabAnti, "Randomization", true, function(state)
+        AntiDetection.RandomizationEnabled = state
+    end)
+    
+    menu:AddToggle(tabAnti, "Behavior Spoofing", true, function(state)
+        AntiDetection.BehaviorSpoofing = state
+    end)
+    
+    menu:AddToggle(tabAnti, "Signature Spoofing", true, function(state)
+        AntiDetection.SignatureSpoofing = state
+    end)
+    
+    menu:AddToggle(tabAnti, "Memory Spoofing", false, function(state)
+        AntiDetection.MemorySpoofing = state
+    end)
+    
+    menu:AddToggle(tabAnti, "Anti-Debug", false, function(state)
+        AntiDetection.AntiDebug = state
+    end)
+    
+    menu:AddToggle(tabAnti, "Anti-Injection", false, function(state)
+        AntiDetection.AntiInjection = state
+    end)
+    
+    menu:AddToggle(tabAnti, "Anti-Tamper", false, function(state)
+        AntiDetection.AntiTamper = state
+    end)
+    
+    menu:AddToggle(tabAnti, "Anti-Memory Scan", false, function(state)
+        AntiDetection.AntiMemoryScan = state
+    end)
+    
+    menu:AddToggle(tabAnti, "Anti-Hook", false, function(state)
+        AntiDetection.AntiHook = state
+    end)
+    
+    -- Tab 7: Settings
+    local tabSettings = menu:CreateTab(mainWindow, "Settings", "⚙️")
+    menu:AddLabel(tabSettings, "General Settings")
+    menu:AddSeparator(tabSettings)
+    
+    local themeSelect, getTheme = menu:AddDropdown(tabSettings, "Theme", {"dark", "light", "neon"}, "dark", function(val)
+        menu.Theme = val
+        -- Update colors
+        for _, window in pairs(menu.Windows) do
+            window.Frame.BackgroundColor3 = menu.Themes[val].Background
+            window.TitleBar.BackgroundColor3 = menu.Themes[val].Foreground
+            window.TitleLabel.TextColor3 = menu.Themes[val].Text
+            window.TabContainer.BackgroundColor3 = menu.Themes[val].Foreground
+            window.ContentFrame.BackgroundColor3 = menu.Themes[val].Background
+        end
+    end)
+    
+    menu:AddToggle(tabSettings, "Animations", true, function(state)
+        menu.Animations.Enabled = state
+    end)
+    
+    menu:AddToggle(tabSettings, "Notifications", true, function(state)
+        menu.Notifications.Enabled = state
+    end)
+    
+    menu:AddToggle(tabSettings, "Hotkeys", true, function(state)
+        menu.Hotkeys.Enabled = state
+    end)
+    
+    menu:AddKeybind(tabSettings, "Menu Toggle Key", "Insert", function(key)
+        menu.Hotkeys.Keys[key] = function()
+            menu:Toggle()
+        end
+    end)
+    
+    menu:AddButton(tabSettings, "Save Config", function()
+        MainEngine:SaveConfig()
+        menu:ShowNotification("Config saved!", 2, "success")
+    end)
+    
+    menu:AddButton(tabSettings, "Load Config", function()
+        MainEngine:LoadConfig()
+        menu:ShowNotification("Config loaded!", 2, "success")
+    end)
+    
+    menu:AddButton(tabSettings, "Reset Config", function()
+        MainEngine:ResetConfig()
+        menu:ShowNotification("Config reset!", 2, "success")
+    end)
+    
+    -- Tab 8: Info
+    local tabInfo = menu:CreateTab(mainWindow, "Info", "ℹ️")
+    menu:AddLabel(tabInfo, "AI Universal Engine v3.0")
+    menu:AddLabel(tabInfo, "Build: 2026.07.28")
+    menu:AddLabel(tabInfo, "Status: " .. self.Status)
+    menu:AddSeparator(tabInfo)
+    menu:AddLabel(tabInfo, "Press INSERT to toggle menu")
+    menu:AddLabel(tabInfo, "Press /help for commands")
+    menu:AddLabel(tabInfo, "Made with AI - Universal Cheat Engine")
+    
+    -- Set default tab
+    if mainWindow.Tabs[1] then
+        mainWindow.Tabs[1].Frame.Visible = true
+        mainWindow.Tabs[1].Button.BackgroundColor3 = menu.Themes[menu.Theme].Foreground
+        mainWindow.CurrentTab = mainWindow.Tabs[1]
+    end
+    
+    self.Menu = menu
+    self.MainWindow = mainWindow
+end
+
+function MainEngine:Start()
+    if self.Status == "running" then
+        print("[AI] Engine already running")
+        return
+    end
+    
+    print("[AI] Starting engine...")
+    self.Status = "running"
+    self.StartTime = os.time()
+    
+    -- Start update loop
+    self:StartUpdateLoop()
+    
+    -- Start services
+    self:StartServices()
+    
+    print("[AI] Engine started!")
+    if self.Menu then
+        self.Menu:ShowNotification("Engine started!", 2, "success")
+    end
+end
+
+function MainEngine:Stop()
+    if self.Status == "stopped" then
+        print("[AI] Engine already stopped")
+        return
+    end
+    
+    print("[AI] Stopping engine...")
+    self.Status = "stopped"
+    
+    -- Stop threads
+    for _, thread in pairs(self.Threads) do
+        thread.Running = false
+    end
+    
+    -- Stop services
+    for _, service in pairs(self.Services) do
+        service.Running = false
+    end
+    
+    print("[AI] Engine stopped!")
+    if self.Menu then
+        self.Menu:ShowNotification("Engine stopped!", 2, "warning")
+    end
+end
+
+function MainEngine:StartUpdateLoop()
+    spawn(function()
+        while self.Status == "running" do
+            local startTime = os.clock()
+            
+            -- Update subsystems
+            pcall(function()
+                -- Update AimBot
+                if AdvancedAimBot.Enabled then
+                    AdvancedAimBot:Update()
+                end
+                
+                -- Update ESP
+                if AdvancedESP.Enabled then
+                    AdvancedESP:Update()
+                end
+                
+                -- Update Movement
+                if AdvancedMovement.BHop.Enabled then
+                    AdvancedMovement:BHop_Update()
+                end
+                
+                if AdvancedMovement.SpeedHack.Enabled then
+                    AdvancedMovement:SpeedHack_Update()
+                end
+                
+                if AdvancedMovement.FlyHack.Enabled then
+                    AdvancedMovement:FlyHack_Update()
+                end
+                
+                if AdvancedMovement.Teleportation.Enabled then
+                    AdvancedMovement:Teleportation_Update()
+                end
+                
+                if AdvancedMovement.AntiCheat.Enabled then
+                    AdvancedMovement:AntiCheat_Update()
+                end
+                
+                -- Update Anti-Detection
+                if AntiDetection.Enabled then
+                    AntiDetection:Update()
+                end
+                
+                -- Update Menu
+                if self.Menu then
+                    self.Menu:Update()
+                end
+            end)
+            
+            -- Update performance metrics
+            local endTime = os.clock()
+            self.Performance.FrameTime = (endTime - startTime) * 1000
+            self.Performance.FPS = 1 / (endTime - startTime + 0.001)
+            self.Performance.MemoryUsage = collectgarbage("count")
+            
+            -- Update uptime
+            self.Uptime = os.time() - self.StartTime
+            
+            wait(self.UpdateInterval)
+        end
+    end)
+end
+
+function MainEngine:StartServices()
+    -- Remote logging service
+    local remoteService = {
+        Running = true,
+        Name = "RemoteService"
+    }
+    spawn(function()
+        while remoteService.Running and self.Status == "running" do
+            wait(5)
+            -- Log remote statistics
+            if RemoteSystem.RemoteLogging then
+                local totalCalls = 0
+                for _, calls in pairs(RemoteSystem.RemoteCalls) do
+                    totalCalls = totalCalls + calls
+                end
+                -- print("[AI] Remote calls:", totalCalls)
+            end
+        end
+    end)
+    table.insert(self.Services, remoteService)
+    
+    -- Performance monitoring service
+    local perfService = {
+        Running = true,
+        Name = "PerformanceService"
+    }
+    spawn(function()
+        while perfService.Running and self.Status == "running" do
+            wait(10)
+            if self.Debug.Enabled then
+                print(string.format("[AI] FPS: %.1f, Memory: %.1f MB, Frame Time: %.2fms",
+                    self.Performance.FPS,
+                    self.Performance.MemoryUsage / 1024,
+                    self.Performance.FrameTime
+                ))
+            end
+        end
+    end)
+    table.insert(self.Services, perfService)
+    
+    -- Anti-detection service
+    local antiService = {
+        Running = true,
+        Name = "AntiDetectionService"
+    }
+    spawn(function()
+        while antiService.Running and self.Status == "running" do
+            wait(15)
+            if AntiDetection.Enabled then
+                local detections, risk = AntiDetection:Detect()
+                if #detections > 0 then
+                    print("[AI] Detections:", #detections, "Risk:", risk)
+                    if risk > 50 then
+                        AntiDetection:Bypass()
+                    end
+                end
+            end
+        end
+    end)
+    table.insert(self.Services, antiService)
+end
+
+function MainEngine:SaveConfig()
+    local config = {
+        AimBot = {
+            Enabled = AdvancedAimBot.Enabled,
+            Mode = AdvancedAimBot.Mode,
+            TargetMode = AdvancedAimBot.TargetMode,
+            Smoothness = AdvancedAimBot.Smoothness,
+            FOV = AdvancedAimBot.FOV,
+            MaxDistance = AdvancedAimBot.MaxDistance,
+            HitChance = AdvancedAimBot.HitChance,
+            BoneSelection = AdvancedAimBot.BoneSelection,
+            Prediction = AdvancedAimBot.Prediction,
+            VisibilityCheck = AdvancedAimBot.VisibilityCheck,
+            Humanization = AdvancedAimBot.Humanization,
+            HumanizationAmount = AdvancedAimBot.HumanizationAmount,
+            TriggerBot = AdvancedAimBot.TriggerBot
+        },
+        ESP = {
+            Enabled = AdvancedESP.Enabled,
+            BoxESP = AdvancedESP.BoxESP,
+            BoxType = AdvancedESP.BoxType,
+            NameESP = AdvancedESP.NameESP,
+            HealthBar = AdvancedESP.HealthBar,
+            DistanceESP = AdvancedESP.DistanceESP,
+            SkeletonESP = AdvancedESP.SkeletonESP,
+            TracerESP = AdvancedESP.TracerESP,
+            GlowESP = AdvancedESP.GlowESP,
+            ChamsESP = AdvancedESP.ChamsESP,
+            RadarESP = AdvancedESP.RadarESP,
+            RadarPosition = AdvancedESP.RadarPosition,
+            MaxDistance = AdvancedESP.MaxDistance
+        },
+        Movement = {
+            BHop = {
+                Enabled = AdvancedMovement.BHop.Enabled,
+                Mode = AdvancedMovement.BHop.Mode,
+                AutoJump = AdvancedMovement.BHop.AutoJump,
+                StrafeEnabled = AdvancedMovement.BHop.StrafeEnabled,
+                StrafeSpeed = AdvancedMovement.BHop.StrafeSpeed,
+                AirControl = AdvancedMovement.BHop.AirControl,
+                CustomSpeed = AdvancedMovement.BHop.CustomSpeed
+            },
+            SpeedHack = {
+                Enabled = AdvancedMovement.SpeedHack.Enabled,
+                Mode = AdvancedMovement.SpeedHack.Mode,
+                WalkSpeed = AdvancedMovement.SpeedHack.WalkSpeed,
+                JumpPower = AdvancedMovement.SpeedHack.JumpPower
+            },
+            FlyHack = {
+                Enabled = AdvancedMovement.FlyHack.Enabled,
+                Mode = AdvancedMovement.FlyHack.Mode,
+                Speed = AdvancedMovement.FlyHack.Speed,
+                NoClip = AdvancedMovement.FlyHack.NoClip
+            },
+            Teleportation = {
+                Enabled = AdvancedMovement.Teleportation.Enabled
+            }
+        },
+        AntiDetection = {
+            Enabled = AntiDetection.Enabled,
+            Mode = AntiDetection.Mode,
+            EncryptionEnabled = AntiDetection.EncryptionEnabled,
+            ObfuscationEnabled = AntiDetection.ObfuscationEnabled,
+            RandomizationEnabled = AntiDetection.RandomizationEnabled,
+            BehaviorSpoofing = AntiDetection.BehaviorSpoofing,
+            SignatureSpoofing = AntiDetection.SignatureSpoofing,
+            MemorySpoofing = AntiDetection.MemorySpoofing
+        },
+        Theme = self.Menu and self.Menu.Theme or "dark"
+    }
+    
+    self.Config = config
+    return config
+end
+
+function MainEngine:LoadConfig()
+    if not self.Config or not next(self.Config) then
+        print("[AI] No config to load")
+        return
+    end
+    
+    local config = self.Config
+    
+    -- Load AimBot config
+    if config.AimBot then
+        AdvancedAimBot.Enabled = config.AimBot.Enabled or false
+        AdvancedAimBot.Mode = config.AimBot.Mode or "silent"
+        AdvancedAimBot.TargetMode = config.AimBot.TargetMode or "closest"
+        AdvancedAimBot.Smoothness = config.AimBot.Smoothness or 10
+        AdvancedAimBot.FOV = config.AimBot.FOV or 120
+        AdvancedAimBot.MaxDistance = config.AimBot.MaxDistance or 1000
+        AdvancedAimBot.HitChance = config.AimBot.HitChance or 85
+        AdvancedAimBot.BoneSelection = config.AimBot.BoneSelection or "head"
+        AdvancedAimBot.Prediction = config.AimBot.Prediction or true
+        AdvancedAimBot.VisibilityCheck = config.AimBot.VisibilityCheck or true
+        AdvancedAimBot.Humanization = config.AimBot.Humanization or true
+        AdvancedAimBot.HumanizationAmount = config.AimBot.HumanizationAmount or 0.3
+        AdvancedAimBot.TriggerBot = config.AimBot.TriggerBot or false
+    end
+    
+    -- Load ESP config
+    if config.ESP then
+        AdvancedESP.Enabled = config.ESP.Enabled or false
+        AdvancedESP.BoxESP = config.ESP.BoxESP or true
+        AdvancedESP.BoxType = config.ESP.BoxType or "2D"
+        AdvancedESP.NameESP = config.ESP.NameESP or true
+        AdvancedESP.HealthBar = config.ESP.HealthBar or true
+        AdvancedESP.DistanceESP = config.ESP.DistanceESP or true
+        AdvancedESP.SkeletonESP = config.ESP.SkeletonESP or false
+        AdvancedESP.TracerESP = config.ESP.TracerESP or false
+        AdvancedESP.GlowESP = config.ESP.GlowESP or false
+        AdvancedESP.ChamsESP = config.ESP.ChamsESP or false
+        AdvancedESP.RadarESP = config.ESP.RadarESP or false
+        AdvancedESP.RadarPosition = config.ESP.RadarPosition or "topright"
+        AdvancedESP.MaxDistance = config.ESP.MaxDistance or 500
+    end
+    
+    -- Load Movement config
+    if config.Movement then
+        if config.Movement.BHop then
+            AdvancedMovement.BHop.Enabled = config.Movement.BHop.Enabled or false
+            AdvancedMovement.BHop.Mode = config.Movement.BHop.Mode or "perfect"
+            AdvancedMovement.BHop.AutoJump = config.Movement.BHop.AutoJump or false
+            AdvancedMovement.BHop.StrafeEnabled = config.Movement.BHop.StrafeEnabled or true
+            AdvancedMovement.BHop.StrafeSpeed = config.Movement.BHop.StrafeSpeed or 1.2
+            AdvancedMovement.BHop.AirControl = config.Movement.BHop.AirControl or true
+            AdvancedMovement.BHop.CustomSpeed = config.Movement.BHop.CustomSpeed or 16
+        end
+        
+        if config.Movement.SpeedHack then
+            AdvancedMovement.SpeedHack.Enabled = config.Movement.SpeedHack.Enabled or false
+            AdvancedMovement.SpeedHack.Mode = config.Movement.SpeedHack.Mode or "normal"
+            AdvancedMovement.SpeedHack.WalkSpeed = config.Movement.SpeedHack.WalkSpeed or 50
+            AdvancedMovement.SpeedHack.JumpPower = config.Movement.SpeedHack.JumpPower or 100
+        end
+        
+        if config.Movement.FlyHack then
+            AdvancedMovement.FlyHack.Enabled = config.Movement.FlyHack.Enabled or false
+            AdvancedMovement.FlyHack.Mode = config.Movement.FlyHack.Mode or "free"
+            AdvancedMovement.FlyHack.Speed = config.Movement.FlyHack.Speed or 50
+            AdvancedMovement.FlyHack.NoClip = config.Movement.FlyHack.NoClip or false
+        end
+        
+        if config.Movement.Teleportation then
+            AdvancedMovement.Teleportation.Enabled = config.Movement.Teleportation.Enabled or false
+        end
+    end
+    
+    -- Load Anti-Detection config
+    if config.AntiDetection then
+        AntiDetection.Enabled = config.AntiDetection.Enabled or false
+        AntiDetection.Mode = config.AntiDetection.Mode or "stealth"
+        AntiDetection.EncryptionEnabled = config.AntiDetection.EncryptionEnabled or true
+        AntiDetection.ObfuscationEnabled = config.AntiDetection.ObfuscationEnabled or true
+        AntiDetection.RandomizationEnabled = config.AntiDetection.RandomizationEnabled or true
+        AntiDetection.BehaviorSpoofing = config.AntiDetection.BehaviorSpoofing or true
+        AntiDetection.SignatureSpoofing = config.AntiDetection.SignatureSpoofing or true
+        AntiDetection.MemorySpoofing = config.AntiDetection.MemorySpoofing or false
+    end
+    
+    -- Load theme
+    if config.Theme and self.Menu then
+        self.Menu.Theme = config.Theme
+    end
+    
+    print("[AI] Config loaded!")
+end
+
+function MainEngine:ResetConfig()
+    self.Config = {}
+    print("[AI] Config reset!")
+end
+
+function MainEngine:HandleCommand(input)
+    local cmd = input:lower()
+    local args = {}
+    for arg in input:gmatch("%S+") do
+        table.insert(args, arg)
+    end
+    
+    if args[1] and self.Commands[args[1]] then
+        self.Commands[args[1]]()
+        return true
+    end
+    
+    return false
+end
+
+-- // ============================================================
+-- // INITIALIZATION & EXECUTION
+-- // ============================================================
+
+-- Initialize the engine
+MainEngine:Initialize()
+
+-- Start the engine
+MainEngine:Start()
+
+-- Command listener
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.Insert then
+        if MainEngine.Menu then
+            MainEngine.Menu:Toggle()
+        end
+    end
+    
+    -- Handle commands
+    if input.KeyCode == Enum.KeyCode.Slash then
+        wait(0.1)
+        -- This would be handled by a chat box in a real implementation
+    end
+end)
+
+-- Anti-AFK
+local function anti_afk()
+    local VirtualUser = game:GetService("VirtualUser")
+    game:GetService("Players").LocalPlayer.Idled:Connect(function()
+        VirtualUser:Button2Down(Vector2.new(0, 0))
+        wait(0.1)
+        VirtualUser:Button2Up(Vector2.new(0, 0))
+    end)
+end
+anti_afk()
+
+-- Print startup info
+print("========================================")
+print("  AI Universal Engine v3.0 Loaded!")
+print("  Built: 2026.07.28")
+print("  Status: Running")
+print("  Press INSERT to open menu")
+print("  Press /help for commands")
+print("========================================")
+
+-- Return the engine
+return MainEngine

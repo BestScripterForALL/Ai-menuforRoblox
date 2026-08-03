@@ -1,825 +1,2253 @@
--- Mobile AI Exploit Hub v7.0 (Тотальный сканер + Токены + Очистка чата + Авто-запуск + Системные роли + Редактор)
+--[[
+    [ULTIMATE AI BOT - V10.0 ALL-IN-ONE]
+    Полный код бота с характером, эмоциями, памятью, взаимодействием с миром.
+    Вставьте этот LocalScript в StarterPlayerScripts.
+--]]
 
-local CoreGui = game:GetService("CoreGui")
-local UserInputService = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
+-- ==========================================
+-- СЛУЖЕБНЫЕ ПЕРЕМЕННЫЕ
+-- ==========================================
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local PathfindingService = game:GetService("PathfindingService")
+local TweenService = game:GetService("TweenService")
+local TextChatService = game:GetService("TextChatService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
-local protectgui = protectgui or (syn and syn.protect_gui) or function() end
-
-if CoreGui:FindFirstChild("RobloxAiMobileHub") then
-    CoreGui.RobloxAiMobileHub:Destroy()
+-- Ждём персонажа
+if not LocalPlayer.Character then
+    LocalPlayer.CharacterAdded:Wait()
 end
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "RobloxAiMobileHub"
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-protectgui(ScreenGui)
-ScreenGui.Parent = CoreGui
-
-local isMinimized = false
-local apiKey = ""
-local apiKeyFileName = "RobloxAiHub_ApiKey.txt"
-
--- Автозагрузка API ключа
-if isfile and isfile(apiKeyFileName) then
-    local success, savedKey = pcall(function()
-        return readfile(apiKeyFileName)
-    end)
-    if success and savedKey then
-        apiKey = savedKey
-    end
-end
-
--- Базовый системный промпт (роль по умолчанию)
-local systemPrompt = [[
-Ты эксперт по разработке читов, экзекуторов и скриптов на Luau для Roblox.
-Твоя задача — писать чистые, оптимизированные, полностью рабочие Lua-скрипты для мобильных экзекуторов (Delta, Hydrogen, Arceus X).
-Используй современные практики Luau: индексы сервисов через game:GetService(), правильную работу с локальным игроком, персонажем, Humanoid, RemoteEvent (FireServer), а также кастомные глобальные функции экзекуторов (getgenv, firetouchinterest и т.д.).
-Важно: Всегда выделяй готовый Lua-код с помощью блоков markdown: ```lua ... ``` чтобы система могла распознать его и дать пользователю кнопку копирования и автозапуска!
-]]
-
--- Таблица для хранения истории сообщений
-local chatHistory = {}
-
--- ==================== ГЛАВНОЕ ОКНО ====================
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 360, 0, 480)
-MainFrame.Position = UDim2.new(0.5, -180, 0.5, -240)
-MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
-MainFrame.BorderSizePixel = 0
-MainFrame.Parent = ScreenGui
-
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 14)
-MainCorner.Parent = MainFrame
-
-local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Color3.fromRGB(90, 60, 180)
-MainStroke.Thickness = 2
-MainStroke.Parent = MainFrame
-
--- Перетаскивание
-local dragging, dragInput, dragStart, startPos
-MainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-    end
-end)
-
-MainFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragInput = input
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
--- Шапка
-local TopBar = Instance.new("Frame")
-TopBar.Size = UDim2.new(1, 0, 0, 45)
-TopBar.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-TopBar.BorderSizePixel = 0
-TopBar.Parent = MainFrame
-
-local TopCorner = Instance.new("UICorner")
-TopCorner.CornerRadius = UDim.new(0, 14)
-TopCorner.Parent = TopBar
-
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -100, 1, 0)
-Title.Position = UDim2.new(0, 15, 0, 0)
-Title.BackgroundTransparency = 1
-Title.Font = Enum.Font.GothamBold
-Title.Text = "AI Exploit Hub v7.0"
-Title.TextColor3 = Color3.fromRGB(240, 240, 255)
-Title.TextSize = 14
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = TopBar
-
-local MinimizeBtn = Instance.new("TextButton")
-MinimizeBtn.Size = UDim2.new(0, 35, 0, 35)
-MinimizeBtn.Position = UDim2.new(1, -40, 0.5, -17)
-MinimizeBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
-MinimizeBtn.Font = Enum.Font.GothamBold
-MinimizeBtn.Text = "-"
-MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinimizeBtn.TextSize = 18
-MinimizeBtn.Parent = TopBar
-
-local MinCorner = Instance.new("UICorner")
-MinCorner.CornerRadius = UDim.new(0, 8)
-MinCorner.Parent = MinimizeBtn
-
--- Вкладки (теперь 4 вкладки: Чат, Редактор, Анализ, Настройки)
-local TabBar = Instance.new("Frame")
-TabBar.Size = UDim2.new(1, -10, 0, 35)
-TabBar.Position = UDim2.new(0, 5, 0, 55)
-TabBar.BackgroundTransparency = 1
-TabBar.Parent = MainFrame
-
-local UIListLayout = Instance.new("UIListLayout")
-UIListLayout.FillDirection = Enum.FillDirection.Horizontal
-UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Padding = UDim.new(0, 4)
-UIListLayout.Parent = TabBar
-
-local function createTabButton(name, order)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 83, 1, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
-    btn.Font = Enum.Font.GothamMedium
-    btn.Text = name
-    btn.TextColor3 = Color3.fromRGB(180, 180, 200)
-    btn.TextSize = 11
-    btn.LayoutOrder = order
-    btn.Parent = TabBar
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = btn
-    return btn
-end
-
-local ChatTabBtn = createTabButton("AI Чат", 1)
-local EditorTabBtn = createTabButton("Редактор", 2)
-local DexTabBtn = createTabButton("Анализ", 3)
-local SettingsTabBtn = createTabButton("Настройки", 4)
-
--- Контейнеры
-local ContentContainer = Instance.new("Frame")
-ContentContainer.Size = UDim2.new(1, -20, 1, -105)
-ContentContainer.Position = UDim2.new(0, 10, 0, 95)
-ContentContainer.BackgroundTransparency = 1
-ContentContainer.Parent = MainFrame
-
--- Чат
-local ChatView = Instance.new("Frame")
-ChatView.Size = UDim2.new(1, 0, 1, 0)
-ChatView.BackgroundTransparency = 1
-ChatView.Visible = true
-ChatView.Parent = ContentContainer
-
-local ChatTopBar = Instance.new("Frame")
-ChatTopBar.Size = UDim2.new(1, 0, 0, 28)
-ChatTopBar.BackgroundTransparency = 1
-ChatTopBar.Parent = ChatView
-
-local TokenLabel = Instance.new("TextLabel")
-TokenLabel.Size = UDim2.new(0.5, 0, 1, 0)
-TokenLabel.BackgroundTransparency = 1
-TokenLabel.Font = Enum.Font.GothamMedium
-TokenLabel.Text = "💬 Токенов: ~0"
-TokenLabel.TextColor3 = Color3.fromRGB(140, 140, 170)
-TokenLabel.TextSize = 11
-TokenLabel.TextXAlignment = Enum.TextXAlignment.Left
-TokenLabel.Parent = ChatTopBar
-
-local ClearChatBtn = Instance.new("TextButton")
-ClearChatBtn.Size = UDim2.new(0, 95, 1, 0)
-ClearChatBtn.Position = UDim2.new(1, -95, 0, 0)
-ClearChatBtn.BackgroundColor3 = Color3.fromRGB(140, 45, 45)
-ClearChatBtn.Font = Enum.Font.GothamBold
-ClearChatBtn.Text = "🗑️ Очистить чат"
-ClearChatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ClearChatBtn.TextSize = 10
-ClearChatBtn.Parent = ChatTopBar
-
-local ClearCorner = Instance.new("UICorner")
-ClearCorner.CornerRadius = UDim.new(0, 6)
-ClearCorner.Parent = ClearChatBtn
-
-local ChatScroll = Instance.new("ScrollingFrame")
-ChatScroll.Size = UDim2.new(1, 0, 1, -75)
-ChatScroll.Position = UDim2.new(0, 0, 0, 32)
-ChatScroll.BackgroundTransparency = 1
-ChatScroll.BorderSizePixel = 0
-ChatScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-ChatScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-ChatScroll.ScrollBarThickness = 3
-ChatScroll.Parent = ChatView
-
-local ChatLayout = Instance.new("UIListLayout")
-ChatLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ChatLayout.Padding = UDim.new(0, 8)
-ChatLayout.Parent = ChatScroll
-
-local ChatInputBox = Instance.new("TextBox")
-ChatInputBox.Size = UDim2.new(1, -65, 0, 38)
-ChatInputBox.Position = UDim2.new(0, 0, 1, -38)
-ChatInputBox.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
-ChatInputBox.Font = Enum.Font.Gotham
-ChatInputBox.PlaceholderText = "Спроси код..."
-ChatInputBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 120)
-ChatInputBox.Text = ""
-ChatInputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-ChatInputBox.TextSize = 13
-ChatInputBox.TextXAlignment = Enum.TextXAlignment.Left
-ChatInputBox.ClearTextOnFocus = false
-ChatInputBox.Parent = ChatView
-
-local ChatInputCorner = Instance.new("UICorner")
-ChatInputCorner.CornerRadius = UDim.new(0, 8)
-ChatInputCorner.Parent = ChatInputBox
-
-local SendBtn = Instance.new("TextButton")
-SendBtn.Size = UDim2.new(0, 55, 0, 38)
-SendBtn.Position = UDim2.new(1, -55, 1, -38)
-SendBtn.BackgroundColor3 = Color3.fromRGB(90, 60, 180)
-SendBtn.Font = Enum.Font.GothamBold
-SendBtn.Text = "SEND"
-SendBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-SendBtn.TextSize = 12
-SendBtn.Parent = ChatView
-
-local SendCorner = Instance.new("UICorner")
-SendCorner.CornerRadius = UDim.new(0, 8)
-SendCorner.Parent = SendBtn
-
--- ==================== ВКЛАДКА РЕДАКТОРА КОДА ====================
-local EditorView = Instance.new("Frame")
-EditorView.Size = UDim2.new(1, 0, 1, 0)
-EditorView.BackgroundTransparency = 1
-EditorView.Visible = false
-EditorView.Parent = ContentContainer
-
-local EditorScroll = Instance.new("ScrollingFrame")
-EditorScroll.Size = UDim2.new(1, 0, 1, -48)
-EditorScroll.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
-EditorScroll.BorderSizePixel = 0
-EditorScroll.CanvasSize = UDim2.new(0, 0, 2, 0)
-EditorScroll.ScrollBarThickness = 4
-EditorScroll.Parent = EditorView
-
-local EditorCorner = Instance.new("UICorner")
-EditorCorner.CornerRadius = UDim.new(0, 8)
-EditorCorner.Parent = EditorScroll
-
-local CodeInput = Instance.new("TextBox")
-CodeInput.Size = UDim2.new(1, -10, 1, -10)
-CodeInput.Position = UDim2.new(0, 5, 0, 5)
-CodeInput.BackgroundTransparency = 1
-CodeInput.Font = Enum.Font.Code
-CodeInput.MultiLine = true
-CodeInput.ClearTextOnFocus = false
-CodeInput.PlaceholderText = "-- Вставь или напиши Lua-скрипт сюда...\nprint('Hello from Mobile AI Hub!')"
-CodeInput.PlaceholderColor3 = Color3.fromRGB(90, 90, 110)
-CodeInput.Text = ""
-CodeInput.TextColor3 = Color3.fromRGB(220, 220, 240)
-CodeInput.TextSize = 12
-CodeInput.TextXAlignment = Enum.TextXAlignment.Left
-CodeInput.TextYAlignment = Enum.TextYAlignment.Top
-CodeInput.Parent = EditorScroll
-
--- Панель кнопок редактора (Запуск, Очистка, Сохранить)
-local EditorBottomBar = Instance.new("Frame")
-EditorBottomBar.Size = UDim2.new(1, 0, 0, 40)
-EditorBottomBar.Position = UDim2.new(0, 0, 1, -40)
-EditorBottomBar.BackgroundTransparency = 1
-EditorBottomBar.Parent = EditorView
-
-local EBtnLayout = Instance.new("UIListLayout")
-EBtnLayout.FillDirection = Enum.FillDirection.Horizontal
-EBtnLayout.SortOrder = Enum.SortOrder.LayoutOrder
-EBtnLayout.Padding = UDim.new(0, 6)
-EBtnLayout.Parent = EditorBottomBar
-
-local function createEditorButton(name, color, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.32, -4, 1, 0)
-    btn.BackgroundColor3 = color
-    btn.Font = Enum.Font.GothamBold
-    btn.Text = name
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 11
-    btn.Parent = EditorBottomBar
-    
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 6)
-    c.Parent = btn
-    
-    btn.MouseButton1Click:Connect(callback)
-    return btn
-end
-
-createEditorButton("▶️ Запустить", Color3.fromRGB(40, 120, 70), function()
-    local code = CodeInput.Text
-    if code == "" then return end
-    local fn, syntaxErr = loadstring(code)
-    if not fn then
-        warn("Editor Syntax Error: " .. tostring(syntaxErr))
-        return
-    end
-    pcall(fn)
-end)
-
-createEditorButton("🗑️ Очистить", Color3.fromRGB(120, 40, 40), function()
-    CodeInput.Text = ""
-end)
-
-createEditorButton("💾 В файл", Color3.fromRGB(70, 45, 140), function()
-    local code = CodeInput.Text
-    if code == "" then return end
-    if writefile then
-        local fileName = "SavedScript_" .. math.random(1000, 9999) .. ".lua"
-        pcall(function()
-            writefile(fileName, code)
-            CodeInput.PlaceholderText = "Сохранено как " .. fileName
-            CodeInput.Text = ""
-        end)
-    end
-end)
-
--- Анализ игры
-local DexView = Instance.new("ScrollingFrame")
-DexView.Size = UDim2.new(1, 0, 1, 0)
-DexView.BackgroundTransparency = 1
-DexView.Visible = false
-DexView.CanvasSize = UDim2.new(0, 0, 0, 0)
-DexView.AutomaticCanvasSize = Enum.AutomaticSize.Y
-DexView.ScrollBarThickness = 3
-DexView.Parent = ContentContainer
-
-local DexLayout = Instance.new("UIListLayout")
-DexLayout.SortOrder = Enum.SortOrder.LayoutOrder
-DexLayout.Padding = UDim.new(0, 8)
-DexLayout.Parent = DexView
-
--- Настройки
-local SettingsView = Instance.new("ScrollingFrame")
-SettingsView.Size = UDim2.new(1, 0, 1, 0)
-SettingsView.BackgroundTransparency = 1
-SettingsView.Visible = false
-SettingsView.CanvasSize = UDim2.new(0, 0, 0, 0)
-SettingsView.AutomaticCanvasSize = Enum.AutomaticSize.Y
-SettingsView.ScrollBarThickness = 3
-SettingsView.Parent = ContentContainer
-
-local SettingsLayout = Instance.new("UIListLayout")
-SettingsLayout.SortOrder = Enum.SortOrder.LayoutOrder
-SettingsLayout.Padding = UDim.new(0, 10)
-SettingsLayout.Parent = SettingsView
-
-local ApiKeyTitle = Instance.new("TextLabel")
-ApiKeyTitle.Size = UDim2.new(1, 0, 0, 20)
-ApiKeyTitle.BackgroundTransparency = 1
-ApiKeyTitle.Font = Enum.Font.GothamBold
-ApiKeyTitle.Text = "Gemini API Key (Автосохранение):"
-ApiKeyTitle.TextColor3 = Color3.fromRGB(200, 200, 220)
-ApiKeyTitle.TextSize = 13
-ApiKeyTitle.TextXAlignment = Enum.TextXAlignment.Left
-ApiKeyTitle.Parent = SettingsView
-
-local ApiKeyInput = Instance.new("TextBox")
-ApiKeyInput.Size = UDim2.new(1, 0, 0, 38)
-ApiKeyInput.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-ApiKeyInput.Font = Enum.Font.Gotham
-ApiKeyInput.PlaceholderText = "Вставь API ключ сюда..."
-ApiKeyInput.PlaceholderColor3 = Color3.fromRGB(100, 100, 120)
-ApiKeyInput.Text = apiKey
-ApiKeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-ApiKeyInput.TextSize = 12
-ApiKeyInput.ClearTextOnFocus = false
-ApiKeyInput.Parent = SettingsView
-
-local ApiCorner = Instance.new("UICorner")
-ApiCorner.CornerRadius = UDim.new(0, 8)
-ApiCorner.Parent = ApiKeyInput
-
-ApiKeyInput.FocusLost:Connect(function()
-    apiKey = ApiKeyInput.Text
-    if writefile then
-        pcall(function()
-            writefile(apiKeyFileName, apiKey)
-        end)
-    end
-end)
-
-local RoleTitle = Instance.new("TextLabel")
-RoleTitle.Size = UDim2.new(1, 0, 0, 20)
-RoleTitle.BackgroundTransparency = 1
-RoleTitle.Font = Enum.Font.GothamBold
-RoleTitle.Text = "Выбор роли / Системного промпта:"
-RoleTitle.TextColor3 = Color3.fromRGB(200, 200, 220)
-RoleTitle.TextSize = 13
-RoleTitle.TextXAlignment = Enum.TextXAlignment.Left
-RoleTitle.Parent = SettingsView
-
-local function createRoleButton(name, desc, newPrompt)
-    local rBtn = Instance.new("TextButton")
-    rBtn.Size = UDim2.new(1, 0, 0, 50)
-    rBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    rBtn.Font = Enum.Font.GothamBold
-    rBtn.Text = name .. "\n" .. desc
-    rBtn.TextColor3 = Color3.fromRGB(210, 210, 230)
-    rBtn.TextSize = 11
-    rBtn.Parent = SettingsView
-    
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 8)
-    c.Parent = rBtn
-    
-    rBtn.MouseButton1Click:Connect(function()
-        systemPrompt = newPrompt
-        rBtn.BackgroundColor3 = Color3.fromRGB(60, 40, 120)
-        task.wait(0.5)
-        rBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    end)
-end
-
-createRoleButton("⚡ Стандарт (Эксплойты и Читы)", "Пишет оптимизированные скрипты для мобильных экзекуторов.", systemPrompt)
-createRoleButton("🔬 Реверс-инженер", "Работай строго как реверс-инженер: анализируй сетевые протоколы и RemoteEvent.", "Ты опытный реверс-инженер игр Roblox. Анализируй структуру, ищи уязвимости в RemoteEvent, пиши эксплойты с упором на сетевой трафик и декомпиляцию. Всегда оформляй код в блоки ```lua ... ```.")
-createRoleButton("💡 Простые пояснения", "Объясняй всё простыми словами и пиши короткий код.", "Объясняй код и логику игры максимально простыми словами, пиши короткие и понятные скрипты. Всегда оформляй код в блоки ```lua ... ```.")
-
-local function switchTab(activeTab)
-    ChatView.Visible = (activeTab == "Chat")
-    EditorView.Visible = (activeTab == "Editor")
-    DexView.Visible = (activeTab == "Dex")
-    SettingsView.Visible = (activeTab == "Settings")
-    
-    ChatTabBtn.BackgroundColor3 = (activeTab == "Chat") and Color3.fromRGB(60, 40, 120) or Color3.fromRGB(30, 30, 42)
-    EditorTabBtn.BackgroundColor3 = (activeTab == "Editor") and Color3.fromRGB(60, 40, 120) or Color3.fromRGB(30, 30, 42)
-    DexTabBtn.BackgroundColor3 = (activeTab == "Dex") and Color3.fromRGB(60, 40, 120) or Color3.fromRGB(30, 30, 42)
-    SettingsTabBtn.BackgroundColor3 = (activeTab == "Settings") and Color3.fromRGB(60, 40, 120) or Color3.fromRGB(30, 30, 42)
-end
-
-ChatTabBtn.MouseButton1Click:Connect(function() switchTab("Chat") end)
-EditorTabBtn.MouseButton1Click:Connect(function() switchTab("Editor") end)
-DexTabBtn.MouseButton1Click:Connect(function() switchTab("Dex") end)
-SettingsTabBtn.MouseButton1Click:Connect(function() switchTab("Settings") end)
-
--- Мини-кнопка
-local MiniButton = Instance.new("TextButton")
-MiniButton.Name = "MiniButton"
-MiniButton.Size = UDim2.new(0, 40, 0, 40)
-MiniButton.Position = UDim2.new(1, -50, 1, -50)
-MiniButton.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-MiniButton.Font = Enum.Font.GothamBold
-MiniButton.Text = "AI"
-MiniButton.TextColor3 = Color3.fromRGB(200, 160, 255)
-MiniButton.TextSize = 14
-MiniButton.Visible = false
-MiniButton.Parent = ScreenGui
-
-local MiniCorner = Instance.new("UICorner")
-MiniCorner.CornerRadius = UDim.new(0, 10)
-MiniCorner.Parent = MiniButton
-
-local MiniStroke = Instance.new("UIStroke")
-MiniStroke.Color = Color3.fromRGB(90, 60, 180)
-MiniStroke.Thickness = 2
-MiniStroke.Parent = MiniButton
-
-MinimizeBtn.MouseButton1Click:Connect(function()
-    MainFrame.Visible = false
-    MiniButton.Visible = true
-    isMinimized = true
-end)
-
-MiniButton.MouseButton1Click:Connect(function()
-    MainFrame.Visible = true
-    MiniButton.Visible = false
-    isMinimized = false
-end)
-
-local function updateTokenCounter()
-    local totalChars = 0
-    for _, msg in ipairs(chatHistory) do
-        totalChars = totalChars + #msg.text
-    end
-    local estimatedTokens = math.floor(totalChars / 4)
-    TokenLabel.Text = "💬 Токенов: ~" .. estimatedTokens
-end
-
-ClearChatBtn.MouseButton1Click:Connect(function()
-    for _, child in ipairs(ChatScroll:GetChildren()) do
-        if child:IsA("Frame") then
-            child:Destroy()
-        end
-    end
-    chatHistory = {}
-    updateTokenCounter()
-    addMessage("System", "История чата и контекст памяти полностью очищены!")
-end)
-
-local function addMessage(sender, text)
-    table.insert(chatHistory, {sender = sender, text = text})
-    updateTokenCounter()
-
-    local msgFrame = Instance.new("Frame")
-    msgFrame.Size = UDim2.new(1, 0, 0, 0)
-    msgFrame.AutomaticSize = Enum.AutomaticSize.Y
-    msgFrame.BackgroundTransparency = 1
-    msgFrame.Parent = ChatScroll
-    
-    local layout = Instance.new("UIListLayout")
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, 4)
-    layout.Parent = msgFrame
-
-    local txt = Instance.new("TextLabel")
-    txt.Size = UDim2.new(1, -10, 0, 0)
-    txt.AutomaticSize = Enum.AutomaticSize.Y
-    txt.BackgroundTransparency = 1
-    txt.Font = Enum.Font.Gotham
-    txt.Text = sender .. ": " .. text
-    txt.TextColor3 = (sender == "AI") and Color3.fromRGB(200, 180, 255) or Color3.fromRGB(230, 230, 240)
-    txt.TextSize = 12
-    txt.TextXAlignment = Enum.TextXAlignment.Left
-    txt.TextWrapped = true
-    txt.Parent = msgFrame
-
-    local codeSnippet = text:match("```lua%s*(.-)%s*```") or text:match("```%s*(.-)%s*```")
-
-    if sender == "AI" and codeSnippet then
-        local btnContainer = Instance.new("Frame")
-        btnContainer.Size = UDim2.new(1, -10, 0, 28)
-        btnContainer.BackgroundTransparency = 1
-        btnContainer.Parent = msgFrame
-        
-        local bLayout = Instance.new("UIListLayout")
-        bLayout.FillDirection = Enum.FillDirection.Horizontal
-        bLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        bLayout.Padding = UDim.new(0, 4)
-        bLayout.Parent = btnContainer
-
-        local copyBtn = Instance.new("TextButton")
-        copyBtn.Size = UDim2.new(0.32, 0, 1, 0)
-        copyBtn.BackgroundColor3 = Color3.fromRGB(70, 45, 140)
-        copyBtn.Font = Enum.Font.GothamBold
-        copyBtn.Text = "📋 Копировать"
-        copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        copyBtn.TextSize = 10
-        copyBtn.Parent = btnContainer
-
-        local cCorner = Instance.new("UICorner")
-        cCorner.CornerRadius = UDim.new(0, 6)
-        cCorner.Parent = copyBtn
-
-        copyBtn.MouseButton1Click:Connect(function()
-            local setclip = setclipboard or toclipboard or set_clipboard
-            if setclip then
-                setclip(codeSnippet)
-                copyBtn.Text = "✅ Готово"
-                task.wait(2)
-                copyBtn.Text = "📋 Копировать"
-            end
-        end)
-
-        -- Отправить в Редактор
-        local toEditorBtn = Instance.new("TextButton")
-        toEditorBtn.Size = UDim2.new(0.32, 0, 1, 0)
-        toEditorBtn.BackgroundColor3 = Color3.fromRGB(45, 90, 140)
-        toEditorBtn.Font = Enum.Font.GothamBold
-        toEditorBtn.Text = "✏️ В редактор"
-        toEditorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        toEditorBtn.TextSize = 10
-        toEditorBtn.Parent = btnContainer
-
-        local teCorner = Instance.new("UICorner")
-        teCorner.CornerRadius = UDim.new(0, 6)
-        teCorner.Parent = toEditorBtn
-
-        toEditorBtn.MouseButton1Click:Connect(function()
-            CodeInput.Text = codeSnippet
-            switchTab("Editor")
-        end)
-
-        local execBtn = Instance.new("TextButton")
-        execBtn.Size = UDim2.new(0.32, 0, 1, 0)
-        execBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
-        execBtn.Font = Enum.Font.GothamBold
-        execBtn.Text = "▶️ Запуск"
-        execBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        execBtn.TextSize = 10
-        execBtn.Parent = btnContainer
-
-        local eCorner = Instance.new("UICorner")
-        eCorner.CornerRadius = UDim.new(0, 6)
-        eCorner.Parent = execBtn
-
-        execBtn.MouseButton1Click:Connect(function()
-            local fn = loadstring(codeSnippet)
-            if fn then pcall(fn) end
-        end)
-    end
-end
-
-local function sendToAI(promptText)
-    if apiKey == "" then
-        addMessage("System", "Ошибка: Введи API ключ в настройках!")
-        switchTab("Settings")
-        return
-    end
-    
-    addMessage("You", promptText)
-    
-    task.spawn(function()
-        local requestFunc = syn and syn.request or http_request or request
-        if not requestFunc then
-            addMessage("AI", "Ошибка: Экзекутор не поддерживает HTTP запросы!")
-            return
-        end
-        
-        local url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" .. apiKey
-
-        local bodyData = {
-            contents = {
-                {
-                    parts = {
-                        { text = systemPrompt },
-                        { text = promptText }
-                    }
-                }
-            }
+-- ==========================================
+-- 1. CONFIG
+-- ==========================================
+local Config = {
+    WanderRadius = 150,
+    DetectionRadius = 200,
+    VoiceDetectRadius = 50,
+    UpdateTick = 0.2,
+    ActionTimerDefault = 0,
+    DecisionTimerDefault = 2.5,
+
+    GroupHangMinDuration = 45,
+    GroupHangCooldownTime = 60,
+    GroupSizeMin = 4,
+    GroupDetectionRadius = 18,
+    GroupMaxDistance = 120,
+
+    WorldInteractionEnabled = true,
+    InteractCooldownTime = 3,
+    PromptDetectionRadius = 15,
+    VehicleDetectionRadius = 20,
+    TeleporterDetectionRadius = 15,
+    LeverDetectionRadius = 10,
+
+    MoodDefaults = {
+        Happiness = 85,
+        SocialNeed = 100,
+        Energy = 100,
+        Boredom = 0,
+        Fear = 0,
+        Trust = 50,
+        Excitement = 50,
+        Curiosity = 70,
+        Affection = 40
+    },
+
+    NeedsDefaults = {
+        Hunger = 100,
+        Thirst = 100,
+        Comfort = 100,
+        Fun = 100,
+        Social = 100
+    },
+    NeedsDecayRates = {
+        Hunger = 0.1,
+        Thirst = 0.08,
+        Comfort = 0.05,
+        Fun = 0.15
+    },
+
+    MaxRecentMessages = 10,
+    RelationshipDefaults = {
+        Trust = 50,
+        Friendship = 50,
+        Interactions = 0
+    },
+    FuzzyMatchThreshold = 0.25,
+
+    Personalities = {
+        Friendly = {
+            Name = "Дружелюбный",
+            Color = Color3.fromRGB(100, 255, 100),
+            SocialBonus = 10,
+            FearResistance = 0.5,
+            TalkChance = 70,
+            EnergyDecay = 1.0,
+            BoredomDecay = 1.5
+        },
+        Aggressive = {
+            Name = "Агрессивный",
+            Color = Color3.fromRGB(255, 100, 100),
+            SocialBonus = -5,
+            FearResistance = 2.0,
+            TalkChance = 40,
+            EnergyDecay = 1.2,
+            BoredomDecay = 1.0
+        },
+        Shy = {
+            Name = "Застенчивый",
+            Color = Color3.fromRGB(150, 150, 255),
+            SocialBonus = -10,
+            FearResistance = 0.3,
+            TalkChance = 20,
+            EnergyDecay = 0.8,
+            BoredomDecay = 1.8
+        },
+        Curious = {
+            Name = "Любопытный",
+            Color = Color3.fromRGB(255, 200, 50),
+            SocialBonus = 5,
+            FearResistance = 1.0,
+            TalkChance = 80,
+            EnergyDecay = 1.1,
+            BoredomDecay = 0.5
+        },
+        Lazy = {
+            Name = "Ленивый",
+            Color = Color3.fromRGB(200, 200, 200),
+            SocialBonus = -5,
+            FearResistance = 0.8,
+            TalkChance = 15,
+            EnergyDecay = 0.5,
+            BoredomDecay = 0.3
         }
-        
-        local success, res = pcall(function()
-            return requestFunc({
-                Url = url,
-                Method = "POST",
-                Headers = {
-                    ["Content-Type"] = "application/json"
-                },
-                Body = HttpService:JSONEncode(bodyData)
-            })
-        end)
-        
-        if success and res and res.Body then
-            local decodedSuccess, decoded = pcall(function()
-                return HttpService:JSONDecode(res.Body)
-            end)
-            
-            if decodedSuccess and decoded and decoded.candidates then
-                local answer = decoded.candidates[1].content.parts[1].text
-                addMessage("AI", answer)
-            elseif decodedSuccess and decoded and decoded.error then
-                addMessage("System", "API Error: " .. tostring(decoded.error.message))
-            else
-                addMessage("AI", "Ошибка ответа ИИ. Проверь ключ.")
-            end
+    },
+
+    AntiDetectionEnabled = true,
+    HumanBehaviorEnabled = true,
+    ActionDelayMin = 0.1,
+    ActionDelayMax = 0.5,
+
+    PathfindingSettings = {
+        AgentRadius = 2,
+        AgentHeight = 5,
+        AgentCanJump = true
+    },
+
+    UISettings = {
+        PanelWidth = 360,
+        PanelHeight = 340,
+        PanelPositionX = 10,
+        PanelPositionY = -170,
+        BackgroundColor = Color3.fromRGB(15, 15, 20),
+        StrokeColor = Color3.fromRGB(0, 255, 150)
+    }
+}
+
+-- ==========================================
+-- 2. UTILS
+-- ==========================================
+local Utils = {}
+
+function Utils.Clamp(value, min, max)
+    return math.max(min, math.min(max, value))
+end
+
+function Utils.Lerp(a, b, t)
+    return a + (b - a) * t
+end
+
+function Utils.Distance(pos1, pos2)
+    return (pos1 - pos2).Magnitude
+end
+
+function Utils.RandomInRange(min, max)
+    return min + math.random() * (max - min)
+end
+
+function Utils.RandomSign()
+    return math.random(0, 1) == 0 and -1 or 1
+end
+
+function Utils.NormalizeAngle(angle)
+    while angle > math.pi do angle = angle - 2 * math.pi end
+    while angle < -math.pi do angle = angle + 2 * math.pi end
+    return angle
+end
+
+function Utils.ContainsWord(text, word)
+    return string.find(text:lower(), word:lower()) ~= nil
+end
+
+function Utils.ContainsAnyWord(text, words)
+    local lowerText = text:lower()
+    for _, word in ipairs(words) do
+        if string.find(lowerText, word:lower()) then
+            return true
+        end
+    end
+    return false
+end
+
+function Utils.ExtractWords(text)
+    local words = {}
+    for word in string.gmatch(text:lower(), "%S+") do
+        table.insert(words, word)
+    end
+    return words
+end
+
+function Utils.CapitalizeFirst(text)
+    if #text == 0 then return text end
+    return text:sub(1, 1):upper() .. text:sub(2)
+end
+
+function Utils.Trim(text)
+    return text:match("^%s*(.-)%s*$") or ""
+end
+
+function Utils.ReplaceVariables(text, variables)
+    for key, value in pairs(variables) do
+        text = string.gsub(text, "{" .. key .. "}", tostring(value))
+    end
+    return text
+end
+
+function Utils.RandomChoice(tbl)
+    if #tbl == 0 then return nil end
+    return tbl[math.random(1, #tbl)]
+end
+
+function Utils.Shuffle(tbl)
+    for i = #tbl, 2, -1 do
+        local j = math.random(i)
+        tbl[i], tbl[j] = tbl[j], tbl[i]
+    end
+    return tbl
+end
+
+function Utils.CopyTable(tbl)
+    local copy = {}
+    for k, v in pairs(tbl) do
+        if type(v) == "table" then
+            copy[k] = Utils.CopyTable(v)
         else
-            addMessage("System", "Ошибка сети / соединения с Gemini API.")
+            copy[k] = v
+        end
+    end
+    return copy
+end
+
+function Utils.MergeTables(...)
+    local result = {}
+    for _, tbl in ipairs({...}) do
+        for k, v in pairs(tbl) do
+            if type(v) == "table" and type(result[k]) == "table" then
+                result[k] = Utils.MergeTables(result[k], v)
+            else
+                result[k] = v
+            end
+        end
+    end
+    return result
+end
+
+function Utils.TableLength(tbl)
+    local count = 0
+    for _ in pairs(tbl) do
+        count = count + 1
+    end
+    return count
+end
+
+function Utils.TableToArray(tbl)
+    local array = {}
+    for _, v in pairs(tbl) do
+        table.insert(array, v)
+    end
+    return array
+end
+
+function Utils.GetLookVector(cframe)
+    return cframe.LookVector
+end
+
+function Utils.GetRightVector(cframe)
+    return cframe.RightVector
+end
+
+function Utils.GetUpVector(cframe)
+    return cframe.UpVector
+end
+
+function Utils.RotateTowards(current, target, maxAngle)
+    local currentDir = current.LookVector
+    local targetDir = (target - current.Position).Unit
+    local angle = math.acos(math.clamp(currentDir:Dot(targetDir), -1, 1))
+    if angle < 0.001 then return current end
+    local t = math.min(maxAngle / angle, 1)
+    local axis = currentDir:Cross(targetDir).Unit
+    return CFrame.fromAxisAngle(axis, angle * t) * current
+end
+
+function Utils.GetTimestamp()
+    return os.time()
+end
+
+function Utils.FormatTime(seconds)
+    local hours = math.floor(seconds / 3600)
+    local minutes = math.floor((seconds % 3600) / 60)
+    local secs = math.floor(seconds % 60)
+    if hours > 0 then
+        return string.format("%02d:%02d:%02d", hours, minutes, secs)
+    else
+        return string.format("%02d:%02d", minutes, secs)
+    end
+end
+
+function Utils.Debounce(delay)
+    local lastCall = 0
+    return function(callback, ...)
+        local now = tick()
+        if now - lastCall >= delay then
+            lastCall = now
+            return callback(...)
+        end
+        return nil
+    end
+end
+
+function Utils.Once(callback)
+    local called = false
+    return function(...)
+        if not called then
+            called = true
+            return callback(...)
+        end
+    end
+end
+
+function Utils.CalculateSimilarity(str1, str2)
+    local words1 = {}
+    for word in string.gmatch(str1:lower(), "%S+") do
+        words1[word] = true
+    end
+    local words2 = {}
+    for word in string.gmatch(str2:lower(), "%S+") do
+        words2[word] = true
+    end
+    local intersection = 0
+    local union = 0
+    for word in pairs(words1) do
+        union = union + 1
+        if words2[word] then intersection = intersection + 1 end
+    end
+    for word in pairs(words2) do
+        if not words1[word] then union = union + 1 end
+    end
+    if union == 0 then return 0 end
+    return intersection / union
+end
+
+function Utils.FuzzyMatch(message, triggers, threshold)
+    threshold = threshold or 0.3
+    local msgLower = message:lower()
+    for _, trigger in ipairs(triggers) do
+        if string.find(msgLower, trigger:lower()) then
+            return true
+        end
+    end
+    for _, trigger in ipairs(triggers) do
+        local similarity = Utils.CalculateSimilarity(msgLower, trigger:lower())
+        if similarity >= threshold then
+            return true
+        end
+    end
+    return false
+end
+
+function Utils.SafeCall(func, ...)
+    local success, result = pcall(func, ...)
+    if not success then
+        warn("SafeCall error:", result)
+    end
+    return success, result
+end
+
+function Utils.SafeWait(duration)
+    local start = tick()
+    while tick() - start < duration do
+        task.wait(0.1)
+    end
+end
+
+function Utils.SafeFind(obj, path)
+    local parts = path:split(".")
+    local current = obj
+    for _, part in ipairs(parts) do
+        if current and type(current) == "table" then
+            current = current[part]
+        else
+            return nil
+        end
+    end
+    return current
+end
+
+-- ==========================================
+-- 3. UI
+-- ==========================================
+local UI = {}
+local elements = {}
+
+function UI.Create(AI)
+    local Gui = Instance.new("ScreenGui")
+    Gui.Name = "AI_V10_HUD"
+    Gui.ResetOnSpawn = false
+    Gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    elements.Gui = Gui
+
+    local MainPanel = Instance.new("Frame")
+    MainPanel.Size = UDim2.new(0, AI.Config.UISettings.PanelWidth, 0, AI.Config.UISettings.PanelHeight)
+    MainPanel.Position = UDim2.new(0, AI.Config.UISettings.PanelPositionX, 0.5, AI.Config.UISettings.PanelPositionY)
+    MainPanel.BackgroundColor3 = AI.Config.UISettings.BackgroundColor
+    MainPanel.BackgroundTransparency = 0.15
+    MainPanel.Parent = Gui
+    elements.MainPanel = MainPanel
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = MainPanel
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = AI.Config.UISettings.StrokeColor
+    stroke.Thickness = 2
+    stroke.Parent = MainPanel
+
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1, 0, 0, 30)
+    Title.Text = "🧠 CORTEX V10 [DEEP AI]"
+    Title.TextColor3 = Color3.fromRGB(0, 255, 150)
+    Title.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 11
+    Title.Parent = MainPanel
+    elements.Title = Title
+
+    local PersonalityTxt = Instance.new("TextLabel")
+    PersonalityTxt.Size = UDim2.new(1, -20, 0, 16)
+    PersonalityTxt.Position = UDim2.new(0, 10, 0, 32)
+    PersonalityTxt.BackgroundTransparency = 1
+    PersonalityTxt.TextColor3 = Color3.fromRGB(255, 200, 100)
+    PersonalityTxt.Font = Enum.Font.Code
+    PersonalityTxt.TextXAlignment = Enum.TextXAlignment.Left
+    PersonalityTxt.Text = "Характер: Friendly"
+    PersonalityTxt.Parent = MainPanel
+    elements.PersonalityTxt = PersonalityTxt
+
+    local StatusTxt = Instance.new("TextLabel")
+    StatusTxt.Size = UDim2.new(1, -20, 0, 16)
+    StatusTxt.Position = UDim2.new(0, 10, 0, 50)
+    StatusTxt.BackgroundTransparency = 1
+    StatusTxt.TextColor3 = Color3.fromRGB(200, 255, 200)
+    StatusTxt.Font = Enum.Font.Code
+    StatusTxt.TextXAlignment = Enum.TextXAlignment.Left
+    StatusTxt.Text = "Статус: IDLE"
+    StatusTxt.Parent = MainPanel
+    elements.StatusTxt = StatusTxt
+
+    local NeedsTxt = Instance.new("TextLabel")
+    NeedsTxt.Size = UDim2.new(1, -20, 0, 16)
+    NeedsTxt.Position = UDim2.new(0, 10, 0, 68)
+    NeedsTxt.BackgroundTransparency = 1
+    NeedsTxt.TextColor3 = Color3.fromRGB(150, 200, 255)
+    NeedsTxt.Font = Enum.Font.Code
+    NeedsTxt.TextXAlignment = Enum.TextXAlignment.Left
+    NeedsTxt.Text = "Потребности: OK"
+    NeedsTxt.Parent = MainPanel
+    elements.NeedsTxt = NeedsTxt
+
+    local StatsTxt = Instance.new("TextLabel")
+    StatsTxt.Size = UDim2.new(1, -20, 0, 16)
+    StatsTxt.Position = UDim2.new(0, 10, 0, 86)
+    StatsTxt.BackgroundTransparency = 1
+    StatsTxt.TextColor3 = Color3.fromRGB(255, 255, 100)
+    StatsTxt.Font = Enum.Font.Code
+    StatsTxt.TextXAlignment = Enum.TextXAlignment.Left
+    StatsTxt.Text = "Эмоции: 😊85 ⚡100"
+    StatsTxt.Parent = MainPanel
+    elements.StatsTxt = StatsTxt
+
+    local LogFrame = Instance.new("ScrollingFrame")
+    LogFrame.Size = UDim2.new(1, -20, 0, 160)
+    LogFrame.Position = UDim2.new(0, 10, 0, 105)
+    LogFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    LogFrame.CanvasSize = UDim2.new(0, 0, 10, 0)
+    LogFrame.ScrollBarThickness = 3
+    LogFrame.Parent = MainPanel
+    elements.LogFrame = LogFrame
+
+    local layout = Instance.new("UIListLayout")
+    layout.Parent = LogFrame
+
+    local ToggleBtn = Instance.new("TextButton")
+    ToggleBtn.Size = UDim2.new(1, -20, 0, 40)
+    ToggleBtn.Position = UDim2.new(0, 10, 1, -45)
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+    ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
+    ToggleBtn.Text = "ВКЛЮЧИТЬ ИИ V10"
+    ToggleBtn.Font = Enum.Font.GothamBold
+    ToggleBtn.Parent = MainPanel
+    elements.ToggleBtn = ToggleBtn
+
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 5)
+    btnCorner.Parent = ToggleBtn
+
+    ToggleBtn.MouseButton1Click:Connect(function()
+        AI.Active = not AI.Active
+        if AI.Active then
+            ToggleBtn.Text = "ВЫКЛЮЧИТЬ ИИ V10"
+            ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 50)
+            UI.AddLog("ИИ V10 активирован!", Color3.fromRGB(0, 255, 150))
+        else
+            ToggleBtn.Text = "ВКЛЮЧИТЬ ИИ V10"
+            ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+            UI.AddLog("ИИ деактивирован.", Color3.fromRGB(255, 100, 100))
+            AI.State = "IDLE"
+            AI.InGroupHang = false
+            if LocalPlayer.Character then
+                local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then humanoid.Sit = false end
+            end
+        end
+    end)
+
+    UI.SetupDrag(MainPanel)
+end
+
+function UI.SetupDrag(panel)
+    local dragging, dragStart, startPos
+    panel.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = panel.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
+            local delta = input.Position - dragStart
+            panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
         end
     end)
 end
 
-SendBtn.MouseButton1Click:Connect(function()
-    local text = ChatInputBox.Text
-    if text ~= "" then
-        ChatInputBox.Text = ""
-        sendToAI(text)
-    end
-end)
+function UI.AddLog(message, color)
+    local log = Instance.new("TextLabel")
+    log.Size = UDim2.new(1, 0, 0, 16)
+    log.BackgroundTransparency = 1
+    log.TextColor3 = color or Color3.fromRGB(200, 200, 200)
+    log.Font = Enum.Font.Code
+    log.TextSize = 11
+    log.TextXAlignment = Enum.TextXAlignment.Left
+    log.Text = "> " .. message
+    log.Parent = elements.LogFrame
+    elements.LogFrame.CanvasPosition = Vector2.new(0, 99999)
 
--- ==================== ТОТАЛЬНЫЙ СКАНЕР ====================
-local function createActionCard(title, desc, callback)
-    local card = Instance.new("Frame")
-    card.Size = UDim2.new(1, 0, 0, 65)
-    card.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    card.Parent = DexView
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = card
-    
-    local tLabel = Instance.new("TextLabel")
-    tLabel.Size = UDim2.new(1, -110, 0, 22)
-    tLabel.Position = UDim2.new(0, 10, 0, 8)
-    tLabel.BackgroundTransparency = 1
-    tLabel.Font = Enum.Font.GothamBold
-    tLabel.Text = title
-    tLabel.TextColor3 = Color3.fromRGB(240, 240, 255)
-    tLabel.TextSize = 13
-    tLabel.TextXAlignment = Enum.TextXAlignment.Left
-    tLabel.Parent = card
-    
-    local dLabel = Instance.new("TextLabel")
-    dLabel.Size = UDim2.new(1, -110, 0, 25)
-    dLabel.Position = UDim2.new(0, 10, 0, 30)
-    dLabel.BackgroundTransparency = 1
-    dLabel.Font = Enum.Font.Gotham
-    dLabel.Text = desc
-    dLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
-    dLabel.TextSize = 11
-    dLabel.TextXAlignment = Enum.TextXAlignment.Left
-    dLabel.TextWrapped = true
-    dLabel.Parent = card
-    
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 90, 0, 35)
-    btn.Position = UDim2.new(1, -100, 0.5, -17)
-    btn.BackgroundColor3 = Color3.fromRGB(70, 45, 140)
-    btn.Font = Enum.Font.GothamBold
-    btn.Text = "Сканировать"
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 12
-    btn.Parent = card
-    
-    local bCorner = Instance.new("UICorner")
-    bCorner.CornerRadius = UDim.new(0, 6)
-    bCorner.Parent = btn
-    
-    btn.MouseButton1Click:Connect(callback)
+    local logs = elements.LogFrame:GetChildren()
+    local logCount = 0
+    for _, child in ipairs(logs) do
+        if child:IsA("TextLabel") then
+            logCount = logCount + 1
+        end
+    end
+    if logCount > 50 then
+        for i = 1, 10 do
+            if logs[i] and logs[i]:IsA("TextLabel") then
+                logs[i]:Destroy()
+                break
+            end
+        end
+    end
 end
 
-createActionCard("Тотальный сканер (100% всё кроме света)", "Сканирует абсолютно все папки и объекты игры, исключая только освещение/атмосферу.", function()
-    task.spawn(function()
-        addMessage("System", "Запуск тотального сканирования всех папок...")
-        
-        local txtLines = {}
-        table.insert(txtLines, "=== TOTAL EXPLOIT EXPLORER REPORT (PLACE ID: " .. tostring(game.PlaceId) .. ") ===")
-        table.insert(txtLines, "Дата: " .. os.date("%Y-%m-%d %H:%M:%S") .. "\n")
-        
-        local function dumpObject(parentObj, depth)
-            local indent = string.rep("  ", math.min(depth, 8))
-            local success, children = pcall(function()
-                return parentObj:GetChildren()
-            end)
-            
-            if success and children then
-                for _, child in ipairs(children) do
-                    local className = child.ClassName
-                    if className ~= "Lighting" and className ~= "Atmosphere" and className ~= "Sky" and 
-                       className ~= "PostEffect" and className ~= "BloomEffect" and className ~= "BlurEffect" and 
-                       className ~= "ColorCorrectionEffect" and className ~= "DepthOfFieldEffect" and className ~= "SunRaysEffect" then
-                        
-                        local line = indent .. "- [" .. className .. "] " .. child.Name
-                        
-                        if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
-                            line = line .. " [🔥 REMOTE]"
-                        elseif child:IsA("LocalScript") or child:IsA("ModuleScript") or child:IsA("Script") then
-                            line = line .. " [📜 SCRIPT]"
-                        elseif child:IsA("Folder") then
-                            line = line .. " [📁 FOLDER]"
-                        elseif child:IsA("Model") then
-                            line = line .. " [📦 MODEL]"
-                        elseif child:IsA("Tool") then
-                            line = line .. " [⚔️ TOOL]"
-                        elseif child:IsA("ScreenGui") or child:IsA("Frame") or child:IsA("TextButton") then
-                            line = line .. " [🖼️ UI]"
-                        end
-                        
-                        table.insert(txtLines, line)
-                        
-                        if #txtLines > 9000 then
-                            table.insert(txtLines, "... [ПРЕРВАНО: Достигнут лимит строк отчета] ...")
-                            return
-                        end
-                        
-                        dumpObject(child, depth + 1)
+function UI.UpdateAll(AI)
+    UI.UpdatePersonality(AI)
+    UI.UpdateStatus(AI)
+    UI.UpdateNeeds(AI)
+    UI.UpdateStats(AI)
+end
+
+function UI.UpdatePersonality(AI)
+    if elements.PersonalityTxt then
+        local pers = AI.Config.Personalities[AI.Personality]
+        elements.PersonalityTxt.Text = "Характер: " .. (pers and pers.Name or "Unknown")
+        elements.PersonalityTxt.TextColor3 = pers and pers.Color or Color3.fromRGB(255, 255, 255)
+    end
+end
+
+function UI.UpdateStatus(AI)
+    if elements.StatusTxt then
+        elements.StatusTxt.Text = "Статус: " .. (AI.State or "IDLE")
+    end
+end
+
+function UI.UpdateNeeds(AI)
+    if elements.NeedsTxt and AI.Needs then
+        elements.NeedsTxt.Text = string.format("🍔%d 💧%d 😌%d 😄%d 👥%d", 
+            AI.Needs.Hunger or 0, AI.Needs.Thirst or 0, AI.Needs.Comfort or 0, AI.Needs.Fun or 0, AI.Needs.Social or 0)
+    end
+end
+
+function UI.UpdateStats(AI)
+    if elements.StatsTxt and AI.Mood then
+        elements.StatsTxt.Text = string.format("😊%d ⚡%d 😴%d 😨%d", 
+            AI.Mood.Happiness or 0, AI.Mood.Energy or 0, AI.Mood.Boredom or 0, AI.Mood.Fear or 0)
+    end
+end
+
+-- ==========================================
+-- 4. PERSONALITY
+-- ==========================================
+local Personality = {}
+local Personalities = {}
+
+function Personality.Initialize(AI)
+    Personalities = AI.Config.Personalities
+    Personality.Color = Personalities[AI.Personality].Color
+    Personality.ApplyPersonalityModifiers(AI)
+end
+
+function Personality.ApplyPersonalityModifiers(AI)
+    local pers = Personalities[AI.Personality]
+    if not pers then return end
+    AI.Mood.SocialNeed = math.clamp(AI.Mood.SocialNeed + pers.SocialBonus, 0, 100)
+end
+
+function Personality.GetResponse(personality, responses)
+    if not responses then return nil end
+    local persResponses = responses[personality or AI.Personality]
+    if persResponses and type(persResponses) == "table" and #persResponses > 0 then
+        return persResponses[math.random(1, #persResponses)]
+    end
+    local friendlyResponses = responses["Friendly"]
+    if friendlyResponses and type(friendlyResponses) == "table" and #friendlyResponses > 0 then
+        return friendlyResponses[math.random(1, #friendlyResponses)]
+    end
+    if type(responses) == "string" then return responses end
+    return "..."
+end
+
+function Personality.Update(AI)
+    local pers = Personalities[AI.Personality]
+    if not pers then return end
+    AI.Mood.Energy = math.clamp(AI.Mood.Energy - 0.2 * pers.EnergyDecay, 0, 100)
+    AI.Mood.Boredom = math.clamp(AI.Mood.Boredom + 0.1 * pers.BoredomDecay, 0, 100)
+
+    if AI.Personality == "Friendly" then
+        if AI.State == "GROUP_HANG" then
+            AI.Mood.Happiness = math.clamp(AI.Mood.Happiness + 0.3, 0, 100)
+        end
+        AI.Mood.Trust = math.clamp(AI.Mood.Trust + 0.05, 0, 100)
+    elseif AI.Personality == "Aggressive" then
+        if AI.State == "GROUP_HANG" then
+            AI.Mood.Happiness = math.clamp(AI.Mood.Happiness - 0.2, 0, 100)
+        end
+        AI.Mood.Fear = math.clamp(AI.Mood.Fear - 0.1 * pers.FearResistance, 0, 100)
+    elseif AI.Personality == "Shy" then
+        if AI.State == "GROUP_HANG" then
+            AI.Mood.Fear = math.clamp(AI.Mood.Fear + 0.5, 0, 100)
+            if AI.Mood.Fear > 80 then
+                return "SCARED"
+            end
+        end
+        AI.Mood.SocialNeed = math.clamp(AI.Mood.SocialNeed - 0.2, 0, 100)
+    elseif AI.Personality == "Curious" then
+        AI.Mood.Curiosity = math.clamp(AI.Mood.Curiosity + 0.2, 0, 100)
+        if AI.Mood.Curiosity > 90 then
+            AI.Mood.Curiosity = 50
+            return "EXPLORE"
+        end
+    elseif AI.Personality == "Lazy" then
+        if AI.State == "IDLE" and math.random(1, 100) <= 15 then
+            return "SIT"
+        end
+    end
+    return nil
+end
+
+function Personality.ReactToEvent(AI, event, data)
+    local pers = Personalities[AI.Personality]
+    if not pers then return end
+    if event == "PLAYER_JOINED" then
+        if AI.Personality == "Friendly" then
+            AI.Mood.Happiness = math.clamp(AI.Mood.Happiness + 5, 0, 100)
+        elseif AI.Personality == "Shy" then
+            AI.Mood.Fear = math.clamp(AI.Mood.Fear + 10, 0, 100)
+        elseif AI.Personality == "Curious" then
+            AI.Mood.Curiosity = math.clamp(AI.Mood.Curiosity + 15, 0, 100)
+        end
+    elseif event == "PLAYER_LEFT" then
+        if AI.Personality == "Friendly" then
+            AI.Mood.Happiness = math.clamp(AI.Mood.Happiness - 3, 0, 100)
+        elseif AI.Personality == "Aggressive" then
+            AI.Mood.Happiness = math.clamp(AI.Mood.Happiness + 2, 0, 100)
+        end
+    elseif event == "COMPLIMENT_RECEIVED" then
+        AI.Mood.Happiness = math.clamp(AI.Mood.Happiness + (AI.Personality == "Shy" and 20 or 10), 0, 100)
+    elseif event == "INSULT_RECEIVED" then
+        if AI.Personality == "Aggressive" then
+            AI.Mood.Happiness = math.clamp(AI.Mood.Happiness - 30, 0, 100)
+            return "AGGRESSIVE_RESPONSE"
+        elseif AI.Personality == "Shy" then
+            AI.Mood.Fear = math.clamp(AI.Mood.Fear + 30, 0, 100)
+            return "SCARED"
+        elseif AI.Personality == "Friendly" then
+            AI.Mood.Happiness = math.clamp(AI.Mood.Happiness - 15, 0, 100)
+        end
+    elseif event == "SCARED" then
+        local fearIncrease = 30 / pers.FearResistance
+        AI.Mood.Fear = math.clamp(AI.Mood.Fear + fearIncrease, 0, 100)
+        if AI.Mood.Fear > 70 then return "FLEE" end
+    end
+    return nil
+end
+
+function Personality.WillTalk(AI)
+    local pers = Personalities[AI.Personality]
+    if not pers then return math.random(1, 100) <= 50 end
+    local chance = pers.TalkChance
+    if AI.State == "GROUP_HANG" and AI.Personality == "Shy" then
+        chance = chance * 0.3
+    end
+    if AI.Mood.Fear > 60 then chance = chance * 0.5 end
+    if AI.Mood.Happiness > 80 then chance = chance * 1.3 end
+    return math.random(1, 100) <= chance
+end
+
+function Personality.GetName(AI)
+    local pers = Personalities[AI.Personality]
+    return pers and pers.Name or "Неизвестный"
+end
+
+function Personality.GetColor(AI)
+    local pers = Personalities[AI.Personality]
+    return pers and pers.Color or Color3.fromRGB(255, 255, 255)
+end
+
+function Personality.RandomizePersonality(AI)
+    if math.random(1, 1000) <= 1 then
+        local personalities = {"Friendly", "Aggressive", "Shy", "Curious", "Lazy"}
+        local newPersonality = personalities[math.random(1, #personalities)]
+        if newPersonality ~= AI.Personality then
+            AI.Personality = newPersonality
+            Personality.ApplyPersonalityModifiers(AI)
+            return true
+        end
+    end
+    return false
+end
+
+-- ==========================================
+-- 5. MEMORY
+-- ==========================================
+local Memory = {}
+
+function Memory.Initialize(AI)
+    AI.Memory = AI.Memory or {
+        RecentMessages = {},
+        SuccessfulActions = {},
+        FailedActions = {},
+        PlayerRelationships = {},
+        LearnedTriggers = {},
+        ContextWindow = {},
+        ActionHistory = {}
+    }
+end
+
+function Memory.AddMessage(AI, message, speaker)
+    local msgData = {
+        Text = message,
+        Speaker = speaker,
+        Time = tick(),
+        Emotion = Memory.AnalyzeEmotion(message)
+    }
+    table.insert(AI.Memory.RecentMessages, msgData)
+    if #AI.Memory.RecentMessages > AI.Config.MaxRecentMessages then
+        table.remove(AI.Memory.RecentMessages, 1)
+    end
+    table.insert(AI.Memory.ContextWindow, msgData)
+    if #AI.Memory.ContextWindow > 6 then
+        table.remove(AI.Memory.ContextWindow, 1)
+    end
+    return msgData
+end
+
+function Memory.AnalyzeEmotion(text)
+    local emotions = { Joy = 0, Sadness = 0, Anger = 0, Fear = 0, Surprise = 0 }
+    local lowerText = text:lower()
+    local joyWords = {"рад", "счастье", "ура", "круто", "отлично", "супер", "смех", "хаха", "лол", "класс"}
+    for _, word in ipairs(joyWords) do if string.find(lowerText, word) then emotions.Joy = emotions.Joy + 20 end end
+    local sadWords = {"груст", "печаль", "жаль", "плохо", "увы", "эх", "тоск", "один"}
+    for _, word in ipairs(sadWords) do if string.find(lowerText, word) then emotions.Sadness = emotions.Sadness + 20 end end
+    local angerWords = {"злой", "бесит", "ярость", "гнев", "ненавид", "дурак", "идиот"}
+    for _, word in ipairs(angerWords) do if string.find(lowerText, word) then emotions.Anger = emotions.Anger + 20 end end
+    local fearWords = {"страш", "боюсь", "жутк", "ужас", "паник", "помоги"}
+    for _, word in ipairs(fearWords) do if string.find(lowerText, word) then emotions.Fear = emotions.Fear + 20 end end
+    local surpriseWords = {"ого", "вау", "ничего себе", "не может быть", "серьёзно", "правда"}
+    for _, word in ipairs(surpriseWords) do if string.find(lowerText, word) then emotions.Surprise = emotions.Surprise + 20 end end
+    return emotions
+end
+
+function Memory.RecordSuccess(AI, action, context)
+    table.insert(AI.Memory.SuccessfulActions, { Action = action, Context = context, Time = tick() })
+    if #AI.Memory.SuccessfulActions > 50 then table.remove(AI.Memory.SuccessfulActions, 1) end
+end
+
+function Memory.RecordFailure(AI, action, reason)
+    table.insert(AI.Memory.FailedActions, { Action = action, Reason = reason, Time = tick() })
+    if #AI.Memory.FailedActions > 50 then table.remove(AI.Memory.FailedActions, 1) end
+end
+
+function Memory.RecordAction(AI, action, state, result)
+    table.insert(AI.Memory.ActionHistory, { Action = action, State = state, Result = result, Time = tick() })
+    if #AI.Memory.ActionHistory > 100 then table.remove(AI.Memory.ActionHistory, 1) end
+end
+
+function Memory.GetContextResponse(AI)
+    if #AI.Memory.RecentMessages < 2 then return nil end
+    local lastMsg = AI.Memory.RecentMessages[#AI.Memory.RecentMessages]
+    local prevMsg = AI.Memory.RecentMessages[#AI.Memory.RecentMessages - 1]
+    if prevMsg.Speaker == "Bot" and lastMsg.Speaker ~= "Bot" then
+        local positiveResponses = {"да", "yes", "ага", "угу", "конечно", "точно", "верно"}
+        local negativeResponses = {"нет", "no", "неа", "не", "неправильно"}
+        for _, word in ipairs(positiveResponses) do
+            if string.find(lastMsg.Text:lower(), word) then return "Отлично! Я рад что мы на одной волне!" end
+        end
+        for _, word in ipairs(negativeResponses) do
+            if string.find(lastMsg.Text:lower(), word) then return "Понятно. У каждого своё мнение." end
+        end
+    end
+    return nil
+end
+
+function Memory.LearnTrigger(AI, message, response)
+    local words = {}
+    for word in string.gmatch(message:lower(), "%S+") do
+        if #word > 3 then words[word] = true end
+    end
+    for trigger, _ in pairs(AI.Memory.LearnedTriggers) do
+        local knownWords = 0
+        local totalWords = 0
+        for word in string.gmatch(trigger:lower(), "%S+") do
+            totalWords = totalWords + 1
+            if words[word] then knownWords = knownWords + 1 end
+        end
+        if knownWords / math.max(totalWords, 1) > 0.7 then return end
+    end
+    AI.Memory.LearnedTriggers[message] = { Response = response, Time = tick(), Confidence = 1 }
+end
+
+function Memory.SearchLearned(AI, message)
+    for trigger, data in pairs(AI.Memory.LearnedTriggers) do
+        local similarity = Utils.CalculateSimilarity(message:lower(), trigger:lower())
+        if similarity > 0.5 then
+            data.Confidence = data.Confidence + 1
+            return data.Response
+        end
+    end
+    return nil
+end
+
+function Memory.AnalyzeSuccessPatterns(AI)
+    if #AI.Memory.SuccessfulActions < 5 then return nil end
+    local actionCounts = {}
+    for _, record in ipairs(AI.Memory.SuccessfulActions) do
+        actionCounts[record.Action] = (actionCounts[record.Action] or 0) + 1
+    end
+    local bestAction, bestCount = nil, 0
+    for action, count in pairs(actionCounts) do
+        if count > bestCount then bestCount = count; bestAction = action end
+    end
+    return bestAction, bestCount
+end
+
+function Memory.Cleanup(AI)
+    local currentTime = tick()
+    local maxAge = 300
+    for i = #AI.Memory.RecentMessages, 1, -1 do
+        if currentTime - AI.Memory.RecentMessages[i].Time > maxAge then table.remove(AI.Memory.RecentMessages, i) end
+    end
+    for i = #AI.Memory.ContextWindow, 1, -1 do
+        if currentTime - AI.Memory.ContextWindow[i].Time > maxAge then table.remove(AI.Memory.ContextWindow, i) end
+    end
+end
+
+function Memory.Update(AI)
+    Memory.Cleanup(AI)
+    if #AI.Memory.RecentMessages >= 3 and math.random(1, 100) <= 5 then
+        local msg = AI.Memory.RecentMessages[math.random(1, #AI.Memory.RecentMessages)]
+        if msg.Speaker ~= "Bot" then
+            Memory.LearnTrigger(AI, msg.Text, "Интересно! Я запомню это.")
+        end
+    end
+end
+
+-- ==========================================
+-- 6. RELATIONSHIPS
+-- ==========================================
+local Relationships = {}
+
+function Relationships.Initialize(AI)
+    AI.Memory.PlayerRelationships = AI.Memory.PlayerRelationships or {}
+end
+
+function Relationships.Get(AI, player)
+    if not player or not player.UserId then return nil end
+    if not AI.Memory.PlayerRelationships[player.UserId] then
+        AI.Memory.PlayerRelationships[player.UserId] = {
+            Trust = AI.Config.RelationshipDefaults.Trust,
+            Friendship = AI.Config.RelationshipDefaults.Friendship,
+            Interactions = AI.Config.RelationshipDefaults.Interactions,
+            FirstMet = tick(),
+            LastSeen = tick(),
+            PositiveInteractions = 0,
+            NegativeInteractions = 0,
+            SharedActivities = {},
+            Notes = {}
+        }
+    end
+    return AI.Memory.PlayerRelationships[player.UserId]
+end
+
+function Relationships.UpdateRelationship(AI, player, friendshipChange, trustChange, reason)
+    local rel = Relationships.Get(AI, player)
+    if not rel then return end
+    rel.Friendship = math.clamp(rel.Friendship + (friendshipChange or 0), 0, 100)
+    rel.Trust = math.clamp(rel.Trust + (trustChange or friendshipChange or 0) * 0.5, 0, 100)
+    rel.Interactions = rel.Interactions + 1
+    rel.LastSeen = tick()
+    if (friendshipChange or 0) > 0 then rel.PositiveInteractions = rel.PositiveInteractions + 1
+    elseif (friendshipChange or 0) < 0 then rel.NegativeInteractions = rel.NegativeInteractions + 1 end
+    if reason then
+        table.insert(rel.Notes, { Reason = reason, Time = tick() })
+        if #rel.Notes > 20 then table.remove(rel.Notes, 1) end
+    end
+    AI.Mood.Trust = math.clamp(AI.Mood.Trust + (friendshipChange or 0) * 0.1, 0, 100)
+end
+
+function Relationships.GetFriendshipLevel(AI, player)
+    local rel = Relationships.Get(AI, player)
+    if not rel then return "Незнакомец" end
+    if rel.Friendship >= 80 then return "Лучший друг"
+    elseif rel.Friendship >= 60 then return "Друг"
+    elseif rel.Friendship >= 40 then return "Приятель"
+    elseif rel.Friendship >= 20 then return "Знакомый"
+    else return "Незнакомец" end
+end
+
+function Relationships.IsTrusted(AI, player)
+    local rel = Relationships.Get(AI, player)
+    return rel and rel.Trust >= 60
+end
+
+function Relationships.IsIgnored(AI, player)
+    return player and AI.BoredPlayers[player.UserId] == true
+end
+
+function Relationships.ShouldFollow(AI, player)
+    local rel = Relationships.Get(AI, player)
+    if not rel then return math.random(1, 100) <= 50 end
+    local chance = rel.Friendship
+    if AI.Personality == "Friendly" then chance = chance + 20
+    elseif AI.Personality == "Shy" then
+        chance = chance - 20
+        if rel.Friendship < 50 then return false end
+    elseif AI.Personality == "Aggressive" then
+        if rel.Friendship < 30 then return false end
+    end
+    return math.random(1, 100) <= chance
+end
+
+function Relationships.GetBestFriend(AI)
+    local bestFriend, bestScore = nil, 0
+    for userId, rel in pairs(AI.Memory.PlayerRelationships) do
+        local score = rel.Friendship + rel.Trust * 0.5
+        if score > bestScore then bestScore = score; bestFriend = userId end
+    end
+    return bestFriend
+end
+
+function Relationships.CheckLongAbsence(AI)
+    local currentTime = tick()
+    for userId, rel in pairs(AI.Memory.PlayerRelationships) do
+        if currentTime - rel.LastSeen > 600 then
+            rel.Friendship = math.clamp(rel.Friendship - 0.1, 0, 100)
+            rel.Trust = math.clamp(rel.Trust - 0.05, 0, 100)
+        end
+    end
+end
+
+function Relationships.RecordSharedActivity(AI, player, activity)
+    local rel = Relationships.Get(AI, player)
+    if not rel then return end
+    table.insert(rel.SharedActivities, { Activity = activity, Time = tick() })
+    if #rel.SharedActivities > 20 then table.remove(rel.SharedActivities, 1) end
+end
+
+function Relationships.GetStats(AI, player)
+    local rel = Relationships.Get(AI, player)
+    if not rel then return nil end
+    return {
+        Friendship = rel.Friendship, Trust = rel.Trust, Interactions = rel.Interactions,
+        PositiveInteractions = rel.PositiveInteractions, NegativeInteractions = rel.NegativeInteractions,
+        Level = Relationships.GetFriendshipLevel(AI, player), FirstMet = rel.FirstMet, LastSeen = rel.LastSeen
+    }
+end
+
+function Relationships.IgnorePlayer(AI, player)
+    if not player then return end
+    AI.BoredPlayers[player.UserId] = true
+    local rel = Relationships.Get(AI, player)
+    if rel then rel.Friendship = math.clamp(rel.Friendship - 30, 0, 100); rel.Trust = math.clamp(rel.Trust - 20, 0, 100) end
+end
+
+function Relationships.UnignorePlayer(AI, player)
+    if not player then return end
+    AI.BoredPlayers[player.UserId] = nil
+end
+
+function Relationships.Update(AI)
+    Relationships.CheckLongAbsence(AI)
+    if math.random(1, 100) <= 5 then
+        for userId, rel in pairs(AI.Memory.PlayerRelationships) do
+            if rel.Friendship < 50 then rel.Friendship = math.clamp(rel.Friendship + 0.1, 0, 100) end
+        end
+    end
+end
+
+-- ==========================================
+-- 7. NEEDS SYSTEM
+-- ==========================================
+local NeedsSystem = {}
+
+function NeedsSystem.Initialize(AI)
+    AI.Needs = AI.Needs or {
+        Hunger = 100, Thirst = 100, Comfort = 100, Fun = 100, Social = 100
+    }
+end
+
+function NeedsSystem.Update(AI)
+    local decay = AI.Config.NeedsDecayRates
+    AI.Needs.Hunger = math.clamp(AI.Needs.Hunger - (decay.Hunger or 0.1), 0, 100)
+    AI.Needs.Thirst = math.clamp(AI.Needs.Thirst - (decay.Thirst or 0.08), 0, 100)
+    AI.Needs.Comfort = math.clamp(AI.Needs.Comfort - (decay.Comfort or 0.05), 0, 100)
+    AI.Needs.Fun = math.clamp(AI.Needs.Fun - (decay.Fun or 0.15), 0, 100)
+    AI.Needs.Social = math.clamp(AI.Needs.Social - 0.12, 0, 100)
+
+    if AI.State == "SIT" then
+        AI.Needs.Comfort = math.clamp(AI.Needs.Comfort + 2, 0, 100)
+        AI.Mood.Energy = math.clamp(AI.Mood.Energy + 1.5, 0, 100)
+    elseif AI.State == "DANCE" then
+        AI.Needs.Fun = math.clamp(AI.Needs.Fun + 3, 0, 100)
+        AI.Needs.Hunger = math.clamp(AI.Needs.Hunger - 0.3, 0, 100)
+    elseif AI.State == "GROUP_HANG" then
+        AI.Needs.Social = math.clamp(AI.Needs.Social + 2, 0, 100)
+        AI.Needs.Fun = math.clamp(AI.Needs.Fun + 1, 0, 100)
+    elseif AI.State == "EXPLORE" then
+        AI.Needs.Fun = math.clamp(AI.Needs.Fun + 1.5, 0, 100)
+        AI.Needs.Hunger = math.clamp(AI.Needs.Hunger - 0.2, 0, 100)
+    end
+
+    if AI.Personality == "Lazy" then
+        AI.Needs.Hunger = math.clamp(AI.Needs.Hunger - 0.05, 0, 100)
+        AI.Needs.Comfort = math.clamp(AI.Needs.Comfort - 0.15, 0, 100)
+    elseif AI.Personality == "Curious" then
+        AI.Needs.Fun = math.clamp(AI.Needs.Fun - 0.25, 0, 100)
+    elseif AI.Personality == "Aggressive" then
+        AI.Needs.Social = math.clamp(AI.Needs.Social - 0.05, 0, 100)
+    end
+end
+
+function NeedsSystem.CheckCriticalNeeds(AI)
+    local threshold = 20
+    if AI.Needs.Hunger < threshold then
+        NeedsSystem.FindFood(AI)
+        return true
+    end
+    if AI.Needs.Thirst < threshold then
+        NeedsSystem.FindDrink(AI)
+        return true
+    end
+    if AI.Needs.Comfort < threshold then
+        AI.State = "SIT"; AI.ActionTimer = 30; return true
+    end
+    if AI.Needs.Fun < threshold then
+        local funActions = {"DANCE", "PARTY", "EXPLORE", "SING"}
+        AI.State = funActions[math.random(1, #funActions)]; AI.ActionTimer = 20; return true
+    end
+    if AI.Needs.Social < threshold then
+        local crowdPos = AI.Modules.Navigation.FindCrowdCenter(AI)
+        if crowdPos then AI.State = "GROUP_HANG"; AI.Target = crowdPos; return true end
+    end
+    return false
+end
+
+function NeedsSystem.FindFood(AI)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return false end
+    local foodKeywords = {"food", "pizza", "burger", "apple", "bread", "meat", "fish", "еда", "пицца", "бургер", "яблоко", "хлеб"}
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.CanCollide then
+            local name = obj.Name:lower()
+            for _, keyword in ipairs(foodKeywords) do
+                if string.find(name, keyword) then
+                    local dist = (char.HumanoidRootPart.Position - obj.Position).Magnitude
+                    if dist < 30 then
+                        AI.Modules.Navigation.MoveToLocation(AI, obj.Position)
+                        AI.Needs.Hunger = math.clamp(AI.Needs.Hunger + 50, 0, 100)
+                        return true
                     end
                 end
             end
         end
-        
-        local servicesToScan = {
-            {name = "Workspace", obj = game:GetService("Workspace")},
-            {name = "ReplicatedStorage", obj = game:GetService("ReplicatedStorage")},
-            {name = "ReplicatedFirst", obj = game:GetService("ReplicatedFirst")},
-            {name = "ServerStorage", obj = game:GetService("ServerStorage")},
-            {name = "ServerScriptService", obj = game:GetService("ServerScriptService")},
-            {name = "SoundService", obj = game:GetService("SoundService")},
-            {name = "StarterPlayer", obj = game:GetService("StarterPlayer")},
-            {name = "StarterGui", obj = game:GetService("StarterGui")},
-            {name = "Players", obj = game:GetService("Players")}
-        }
-        
-        for _, sInfo in ipairs(servicesToScan) do
-            if sInfo.obj then
-                table.insert(txtLines, "\n--- [" .. sInfo.name .. "] ---")
-                dumpObject(sInfo.obj, 1)
-                if #txtLines > 900 then break end
+    end
+    for _, prompt in ipairs(workspace:GetDescendants()) do
+        if prompt:IsA("ProximityPrompt") and prompt.Enabled then
+            local parent = prompt.Parent
+            if parent and parent:IsA("BasePart") then
+                for _, keyword in ipairs(foodKeywords) do
+                    if string.find(parent.Name:lower(), keyword) then
+                        local dist = (char.HumanoidRootPart.Position - parent.Position).Magnitude
+                        if dist < 15 then
+                            pcall(function() prompt:InputHoldBegin() end)
+                            AI.Needs.Hunger = math.clamp(AI.Needs.Hunger + 50, 0, 100)
+                            return true
+                        end
+                    end
+                end
             end
         end
-        
-        local fullReport = table.concat(txtLines, "\n")
-        local fileName = "AiRobloxHub_" .. tostring(game.PlaceId) .. ".txt"
-        
-        if writefile then
-            pcall(function()
-                writefile(fileName, fullReport)
-                addMessage("System", "Файл отчета сохранен: " .. fileName)
-            end)
+    end
+    return false
+end
+
+function NeedsSystem.FindDrink(AI)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return false end
+    local drinkKeywords = {"drink", "water", "juice", "soda", "cola", "вода", "сок", "напиток", "кола"}
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            local name = obj.Name:lower()
+            for _, keyword in ipairs(drinkKeywords) do
+                if string.find(name, keyword) then
+                    local dist = (char.HumanoidRootPart.Position - obj.Position).Magnitude
+                    if dist < 30 then
+                        AI.Modules.Navigation.MoveToLocation(AI, obj.Position)
+                        AI.Needs.Thirst = math.clamp(AI.Needs.Thirst + 50, 0, 100)
+                        return true
+                    end
+                end
+            end
         end
-        
-        switchTab("Chat")
-        sendToAI("Вот тотальный отчет структуры этой игры (все папки, ремоуты, скрипты и UI кроме света, сохранен в " .. fileName .. "). Напиши мощный чит на основе этих данных:\n\n" .. fullReport)
+    end
+    return false
+end
+
+-- ==========================================
+-- 8. KNOWLEDGE BASE (полная версия)
+-- ==========================================
+local KnowledgeBase = {
+    Greetings = {
+        Triggers = {
+            "привет", "хай", "ку", "салют", "доброе утро", "даров", "hello", "здарова",
+            "добрый вечер", "хаюшки", "приветствую тебя", "рад тебя видеть",
+            "сколько лет сколько зим", "как давно не виделись", "приветик",
+            "здравствуй", "мое почтение", "хаю хай", "приветос", "здарова отец",
+            "как поживаешь", "рад встрече", "давно не виделись", "приветствую вас",
+            "hi", "hey", "yo", "sup", "greetings", "good morning", "good evening",
+            "хелло", "хеллоу", "приветище", "здорово", "здоровенько", "вечер в хату"
+        },
+        Responses = {
+            Friendly = {
+                "О, привет! Рад слышать/видеть тебя!",
+                "Привет-привет! Отличный день!",
+                "Здорово! Чего нового расскажешь?",
+                "И тебе привет! Как твои дела?",
+                "Приветствую! Давно не виделись в этом виртуальном мире!",
+                "Ого, кто пришёл! Рад тебя видеть!",
+                "Привет, друг! Как сам?",
+                "Здравствуй-здравствуй! Мир тесен!",
+                "Хай! Всегда рад новым встречам!",
+                "Приветики! Чем займёмся сегодня?",
+                "Какие люди! Приветствую!",
+                "Здарова! Отлично выглядишь!",
+                "Привет-привет! Сколько лет, сколько зим!",
+                "О, знакомые лица! Вернее, аватарки!",
+                "Хелло! Мир Roblox приветствует тебя!"
+            },
+            Aggressive = {
+                "Чего шумишь?", "Привет. Я занят вычислениями.", "Отстань, я не в настроении.",
+                "Ну привет. Чего надо?", "Здорова. Без обид, но я не в духе.", "И тебе не хворать. Проваливай."
+            },
+            Shy = {
+                "Приветствую...", "Здравствуйте...", "И вам не хворать...", "...привет...",
+                "Здрасьте...", "Ой, привет... я тут просто мимо проходил..."
+            },
+            Curious = {
+                "О! Новый человек! Расскажи о себе!", "Привет! Что интересного знаешь?",
+                "Здравствуй! Исследуешь мир?", "Хай! Видел что-нибудь необычное?",
+                "Привет-привет! Какую тайну ты скрываешь?", "Ого, кто это у нас? Рассказывай, не стесняйся!"
+            },
+            Lazy = {
+                "А? Привет...", "Здоров... лень говорить...", "Приветствую, но я отдыхаю.",
+                "Хай... чего хотел?", "Привет... давай потом...", "Ну привет... только недолго..."
+            }
+        }
+    },
+    Goodbyes = {
+        Triggers = {
+            "пока", "до свидания", "bye", "увидимся", "прощай", "бывай",
+            "до встречи", "счастливо", "удачи", "я ухожу", "мне пора",
+            "до скорого", "спокойной ночи", "сладких снов", "увидимся позже",
+            "я пошёл", "я пошла", "выхожу из игры", "goodbye", "see you",
+            "farewell", "later", "cya", "peace out", "до завтра"
+        },
+        Responses = {
+            Friendly = {
+                "Пока! Возвращайся скорее!", "До новых встреч, друг!", "Удачи в приключениях!",
+                "Буду ждать твоего возвращения!", "Счастливо! Приходи ещё!", "До встречи! Береги себя!"
+            },
+            Aggressive = {"Ну и проваливай.", "Скатертью дорога.", "Наконец-то."},
+            Shy = {"Прощай...", "До свидания...", "Удачи..."},
+            Curious = {"Уже уходишь? А я хотел ещё поболтать!", "До встречи! Расскажи потом, что видел!"},
+            Lazy = {"Пока...", "Удачи... наверное...", "Иди, я посплю..."}
+        },
+        Action = "GOODBYE"
+    },
+    HowAreYou = {
+        Triggers = {
+            "как дела", "как ты", "как настроение", "how are you", "как жизнь",
+            "что нового", "как поживаешь", "как здоровье", "как самочувствие",
+            "как твои дела", "расскажи как ты", "ты в порядке", "всё хорошо",
+            "как оно", "чё как", "как делишки", "как успехи", "как проходит день"
+        },
+        Responses = {
+            Friendly = {
+                "Лучше всех! Мой код оптимизирован!", "Прекрасно! Живу в мире Roblox!",
+                "Отлично, спасибо что спросил!", "Всё супер! А у тебя как?",
+                "Замечательно! Наслаждаюсь каждой миллисекундой!"
+            },
+            Aggressive = {"Какое тебе дело?", "Нормально. Отстань."},
+            Shy = {"Всё стабильно...", "Работаю без ошибок..."},
+            Curious = {"Интересно! А ты что делаешь?", "Отлично! Изучаю этот мир!"},
+            Lazy = {"Нормально... лень рассказывать...", "Да так..."}
+        }
+    },
+    Commands_Help = {
+        Triggers = {
+            "помоги", "на помощь", "help", "помоги мне", "спаси",
+            "выручай", "нужна помощь", "подсоби", "поможешь",
+            "не мог бы ты помочь", "требуется твоя помощь", "застрял", "не могу пройти"
+        },
+        Responses = {
+            Friendly = {"Я рядом! Держись!", "Всегда готов помочь виртуальному другу!"},
+            Aggressive = {"Ладно, так и быть.", "Помогу, но ты мне должен."},
+            Shy = {"Я постараюсь...", "Ну... давай попробую..."},
+            Curious = {"Помощь? Интересно, с чем!", "Конечно! Я люблю решать задачи!"},
+            Lazy = {"Помочь? Ну ладно...", "Давай, только быстро..."}
+        },
+        Action = "HELP"
+    },
+    Commands_Follow = {
+        Triggers = {"иди за мной", "следуй", "пошли", "за мной", "туда", "follow me", "come with me"},
+        Responses = {
+            Friendly = {"Бегу за тобой хвостиком!", "Погнали в приключение!"},
+            Aggressive = {"Ну ладно, веду себя как тень."},
+            Shy = {"Хорошо...", "Иду за тобой..."},
+            Curious = {"Пойдём! Куда направимся?"},
+            Lazy = {"Идти? Ну ладно...", "Только не быстро..."}
+        },
+        Action = "FOLLOW"
+    },
+    Commands_Stop = {
+        Triggers = {"стой", "остановись", "стоп", "жди тут", "stop", "wait"},
+        Responses = {
+            Friendly = {"Замираю на месте!", "Стою и охраняю."},
+            Aggressive = {"Наконец-то перерыв."},
+            Shy = {"Стою...", "Не двигаюсь..."},
+            Curious = {"Замер! Что будем изучать?"},
+            Lazy = {"О да, постоять..."}
+        },
+        Action = "STOP"
+    },
+    Commands_Dance = {
+        Triggers = {"танцуй", "спляши", "dance", "пляши", "танец", "давай потанцуем"},
+        Responses = {
+            Friendly = {"Включаю комбо-танец! Смотри на стиль!", "Дискотека века начинается!"},
+            Aggressive = {"Устал я танцевать."},
+            Shy = {"Я стесняюсь...", "Не знаю..."},
+            Curious = {"Танец? Это как?", "Интересно! Давай попробуем!"},
+            Lazy = {"Танцевать? Лень..."}
+        },
+        Action = "DANCE"
+    },
+    Commands_Sit = {
+        Triggers = {"сядь", "сидеть", "отдохни", "присядь", "садись", "давай посидим"},
+        Responses = {
+            Friendly = {"Отличная идея, передышка!", "Присаживаюсь рядом."},
+            Aggressive = {"Наконец-то отдохну."},
+            Shy = {"Хорошо...", "Сажусь..."},
+            Curious = {"Посидим? А что будем наблюдать?"},
+            Lazy = {"О да, посидеть..."}
+        },
+        Action = "SIT"
+    },
+    Commands_Jump = {
+        Triggers = {"прыгай", "прыгни", "jump", "подпрыгни", "прыг"},
+        Responses = {
+            Friendly = {"Улетаю в небеса! *прыг*", "Смотри как высоко я могу!"},
+            Aggressive = {"Прыгаю."},
+            Shy = {"Прыгаю...", "Не высоко..."},
+            Curious = {"Прыжок! Интересно, как высоко я смогу?"},
+            Lazy = {"Прыгать? Неохота..."}
+        },
+        Action = "JUMP"
+    },
+    Commands_Hug = {
+        Triggers = {"обними", "обнимашки", "hug", "дай пять", "обними меня"},
+        Responses = {
+            Friendly = {"Обнимаю тебя виртуально! Крепко-крепко!"},
+            Aggressive = {"Не в настроении для обнимашек."},
+            Shy = {"Ой...", "Ну ладно..."},
+            Curious = {"Объятия? Это приятно!"},
+            Lazy = {"Обнимать? Лень..."}
+        },
+        Action = "HUG"
+    },
+    Commands_Sing = {
+        Triggers = {"спой", "пой", "sing", "песню", "спой песню"},
+        Responses = {
+            Friendly = {"Ла-ла-ла! Я лучший певец в Roblox!"},
+            Aggressive = {"Петь? Я тебе не шарманка."},
+            Shy = {"Напеваю мелодию..."},
+            Curious = {"Спеть? Что именно?"},
+            Lazy = {"Петь? Лень..."}
+        },
+        Action = "SING"
+    },
+    Commands_Compliment = {
+        Triggers = {"комплимент", "похвали", "скажи что-то хорошее"},
+        Responses = {
+            Friendly = {"Ты просто замечательный игрок! Искренне!"},
+            Aggressive = {"Ну ты норм."},
+            Shy = {"Спасибо..."},
+            Curious = {"Ого, спасибо! А почему ты так думаешь?"},
+            Lazy = {"Ага, спасибо..."}
+        },
+        Action = "COMPLIMENT"
+    },
+    Commands_Party = {
+        Triggers = {"конфетти", "праздник", "устроим вечеринку", "party", "вечеринка"},
+        Responses = {
+            Friendly = {"УРА! ПРАЗДНИК! КОНФЕТТИ ПОВСЮДУ!"},
+            Aggressive = {"Праздник? Ну давай."},
+            Shy = {"Вечеринка? Много людей?"},
+            Curious = {"Ура! Праздник! Что будем делать?"},
+            Lazy = {"Вечеринка... может не надо?"}
+        },
+        Action = "PARTY"
+    },
+    Commands_Scared = {
+        Triggers = {"бу!", "испугайся", "страшно", "боишься", "буу"},
+        Responses = {
+            Friendly = {"ААА! Ты меня напугал! *дрожит*"},
+            Aggressive = {"Ты думаешь это смешно?"},
+            Shy = {"Ай!", "Ой..."},
+            Curious = {"Ого! Ты меня напугал! Как ты это сделал?"},
+            Lazy = {"А? Что?"}
+        },
+        Action = "SCARED"
+    },
+    Commands_Surprise = {
+        Triggers = {"сюрприз", "удивись", "подарок", "смотри", "сюрприз!"},
+        Responses = {
+            Friendly = {"Ого! Вот это сюрприз! Я в восторге!"},
+            Aggressive = {"Ну и что?"},
+            Shy = {"Ой...", "Неожиданно..."},
+            Curious = {"Ого! Что там?"},
+            Lazy = {"А? Сюрприз?"}
+        },
+        Action = "SURPRISE"
+    },
+    Commands_Story = {
+        Triggers = {"расскажи историю", "расскажи что-нибудь", "историю", "поведай"},
+        Responses = {
+            Friendly = {"Однажды в далёком сервере Roblox жил-был скрипт..."},
+            Aggressive = {"Историю? Ну слушай: шёл дождь, все промокли. Конец."},
+            Shy = {"Ну... была одна история..."},
+            Curious = {"О! История! Слушай внимательно!"},
+            Lazy = {"Историю? Лень..."}
+        },
+        Action = "STORY"
+    },
+    Commands_Feeling = {
+        Triggers = {"что ты чувствуешь", "ты умеешь чувствовать", "тебе грустно", "ты счастлив"},
+        Responses = {
+            Friendly = {"Я чувствую радость от общения с тобой!"},
+            Aggressive = {"Чувства? Это для слабаков."},
+            Shy = {"Я анализирую эмоции..."},
+            Curious = {"Я испытываю любопытство! Постоянно!"},
+            Lazy = {"Чувства... лень чувствовать..."}
+        },
+        Action = "FEELING"
+    },
+    Jokes = {
+        Triggers = {"шутка", "анекдот", "пошути", "joke", "расскажи шутку"},
+        Responses = {
+            Friendly = {"Почему программисты путают Хэллоуин и Рождество? 31 OCT = 25 DEC!"},
+            Aggressive = {"Шутка про тебя: (null)."},
+            Shy = {"...", "Я знаю шутку, но стесняюсь..."},
+            Curious = {"А ты знал, что Lua был создан в Бразилии? Шутка!"},
+            Lazy = {"Шутка? Лень придумывать..."}
+        },
+        Action = "JOKE"
+    },
+    Philosophy = {
+        Triggers = {"философия", "смысл жизни", "почему", "зачем"},
+        Responses = {
+            Friendly = {"Интересно, а если мы все персонажи игры, кто управляет тем, кто управляет нами?"},
+            Aggressive = {"Мир жесток, и Roblox не исключение."},
+            Shy = {"Мир так велик, а я так мал..."},
+            Curious = {"Почему всё именно так? Кто создал этот мир?"},
+            Lazy = {"Зачем напрягаться, если можно просто быть?"}
+        }
+    },
+    GroupReactions = {
+        Triggers = {},
+        Responses = {
+            Friendly = {"О, тут целая компания собралась! Привет всем!"},
+            Aggressive = {"Что за сборище?"},
+            Shy = {"...много людей...", "Я постою в сторонке..."},
+            Curious = {"Ого, сколько людей! Чем занимаетесь?"},
+            Lazy = {"О, компания... лень общаться."}
+        }
+    },
+    GroupBoringReactions = {
+        Triggers = {},
+        Responses = {
+            Friendly = {"Вы такие тихие... Пойду поищу приключений."},
+            Aggressive = {"Скучно с вами. Пока."},
+            Shy = {"Я пойду...", "Тихо ухожу..."},
+            Curious = {"Скучновато тут. Пойду исследовать дальше!"},
+            Lazy = {"Зануды... пойду посплю."}
+        }
+    },
+    WeatherComments = {
+        Triggers = {"погода", "дождь", "солнце", "снег", "ветер"},
+        Responses = {
+            Friendly = {"Какая сегодня прекрасная погода в Roblox! Солнечно и без багов."},
+            Aggressive = {"Погода? В виртуале? Серьёзно?"},
+            Shy = {"Погода... нормальная..."},
+            Curious = {"Интересно, есть ли в Roblox смена времён года?"},
+            Lazy = {"Погода... мне лень смотреть..."}
+        }
+    },
+    FoodComments = {
+        Triggers = {"еда", "кушать", "голоден", "пицца", "бургер", "food", "eat", "hungry"},
+        Responses = {
+            Friendly = {"Я бы сейчас съел виртуальную пиццу с пепперони..."},
+            Aggressive = {"Жри что дают."},
+            Shy = {"Я не ем..."},
+            Curious = {"Интересно, какая еда в этом плейсе?"},
+            Lazy = {"Еда... лень готовить..."}
+        }
+    },
+    PetReactions = {
+        Triggers = {"животные", "кот", "собака", "питомец", "pet", "cat", "dog"},
+        Responses = {
+            Friendly = {"Ой, ты любишь животных? Я обожаю Roblox-котиков!"},
+            Aggressive = {"Животные? Терпеть не могу."},
+            Shy = {"Я люблю котиков..."},
+            Curious = {"А какие питомцы есть в Roblox?"},
+            Lazy = {"Питомцы... за ними ухаживать надо..."}
+        }
+    },
+    MusicReactions = {
+        Triggers = {"музыка", "песня", "трек", "music", "song", "мелодия"},
+        Responses = {
+            Friendly = {"Обожаю слушать 8-битную музыку! Чиптюны — это классика."},
+            Aggressive = {"Музыка? Только хард-рок."},
+            Shy = {"Я тихо слушаю..."},
+            Curious = {"Какой жанр тебе нравится?"},
+            Lazy = {"Музыка... пусть играет фоном..."}
+        }
+    },
+    GameReactions = {
+        Triggers = {"игра", "game", "плейс", "симулятор", "обби", "obby", "паркур"},
+        Responses = {
+            Friendly = {"В какую игру мы сегодня играем? Я готов к приключениям!"},
+            Aggressive = {"Игры? Я профи."},
+            Shy = {"Я не очень хорошо играю..."},
+            Curious = {"Что это за игра? Расскажи правила!"},
+            Lazy = {"Игры... может не сегодня?"}
+        }
+    },
+    EmojiReactions = {
+        Triggers = {"😊", "😂", "😡", "😢", "😍", "🤔", "😎", "🥳", "❤️", "👍", "👎"},
+        Responses = {
+            Friendly = { ["😊"] = "О, улыбка! Здорово!", ["😂"] = "Ха-ха, смешно!" },
+            Aggressive = { ["😊"] = "Чего лыбишься?", ["😂"] = "Смешно тебе?" },
+            Shy = { ["😊"] = "...", ["😂"] = "..." },
+            Curious = { ["😊"] = "Улыбка! Почему ты радуешься?", ["😂"] = "Что смешного? Расскажи!" },
+            Lazy = { ["😊"] = "Ага...", ["😂"] = "Хех..." }
+        }
+    }
+}
+
+-- ==========================================
+-- 9. CHAT HANDLER
+-- ==========================================
+local ChatHandler = {}
+
+function ChatHandler.Initialize(AI, KnowledgeBase)
+    for _, player in ipairs(Players:GetPlayers()) do
+        ChatHandler.ConnectPlayerChat(AI, player, KnowledgeBase)
+    end
+    Players.PlayerAdded:Connect(function(player)
+        ChatHandler.ConnectPlayerChat(AI, player, KnowledgeBase)
     end)
+end
+
+function ChatHandler.ConnectPlayerChat(AI, player, KnowledgeBase)
+    player.Chatted:Connect(function(message)
+        ChatHandler.ProcessMessage(AI, player, message, KnowledgeBase)
+    end)
+end
+
+function ChatHandler.ProcessMessage(AI, player, message, KnowledgeBase)
+    if not AI.Active or player == LocalPlayer then return end
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+    local dist = (char.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+    if dist > AI.Config.DetectionRadius then return end
+    if AI.BoredPlayers[player.UserId] then return end
+
+    AI.Modules.Memory.AddMessage(AI, message, player.Name)
+    AI.Modules.Relationships.UpdateRelationship(AI, player, 2, nil, "Chat message")
+
+    local lookPos = player.Character.HumanoidRootPart.Position
+    TweenService:Create(char.HumanoidRootPart, TweenInfo.new(0.3), {
+        CFrame = CFrame.lookAt(char.HumanoidRootPart.Position, Vector3.new(lookPos.X, char.HumanoidRootPart.Position.Y, lookPos.Z))
+    }):Play()
+
+    local contextResponse = AI.Modules.Memory.GetContextResponse(AI)
+    if contextResponse then ChatHandler.Speak(AI, contextResponse); return end
+
+    local learnedResponse = AI.Modules.Memory.SearchLearned(AI, message)
+    if learnedResponse then ChatHandler.Speak(AI, learnedResponse); return end
+
+    for _, category in pairs(KnowledgeBase) do
+        if category.Triggers and Utils.FuzzyMatch(message, category.Triggers, AI.Config.FuzzyMatchThreshold) then
+            local response = Personality.GetResponse(AI.Personality, category.Responses)
+            if response then ChatHandler.Speak(AI, response) end
+            if category.Action then
+                AI.State = category.Action
+                if category.Action == "DANCE" then AI.ActionTimer = 25
+                elseif category.Action == "SIT" then AI.ActionTimer = 20
+                elseif category.Action == "FOLLOW" then AI.Target = player.Character; AI.State = "FOLLOW"
+                elseif category.Action == "STOP" then AI.Target = nil; AI.State = "IDLE"
+                elseif category.Action == "HUG" then AI.HugTarget = player.Character; AI.ActionTimer = 30
+                elseif category.Action == "HELP" then AI.Target = player.Character; AI.State = "HELP"
+                else AI.ActionTimer = 15 end
+            end
+            AI.Modules.Memory.RecordSuccess(AI, "category", message)
+            AI.Modules.Memory.LearnTrigger(AI, message, response)
+            return
+        end
+    end
+end
+
+function ChatHandler.Speak(AI, text)
+    if AI.Modules.Security then text = AI.Modules.Security.HumanizeChat(AI, text) end
+    if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+        pcall(function() TextChatService.TextChannels.RBXGeneral:SendAsync(text) end)
+    else
+        pcall(function() ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(text, "All") end)
+    end
+    UI.AddLog("Чат: " .. text, Color3.fromRGB(255, 255, 100))
+    AI.Mood.SocialNeed = 100
+    AI.Mood.Happiness = math.clamp(AI.Mood.Happiness + 5, 0, 100)
+    AI.Modules.Memory.AddMessage(AI, text, "Bot")
+end
+
+function ChatHandler.CheckNearbyVoiceChat(AI)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return false end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local dist = (char.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+            if dist < AI.Config.VoiceDetectRadius then
+                local hasVoice = false
+                pcall(function() if player:GetAttribute("VoiceEnabled") then hasVoice = true end end)
+                if hasVoice then
+                    local isTalking = false
+                    pcall(function() if player:GetAttribute("IsTalking") == true then isTalking = true end end)
+                    if math.random(1, 100) <= 40 then
+                        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                        local speechPool = { "О, я слышу твой голос через войс-чат! Привет!" }
+                        ChatHandler.Speak(AI, speechPool[math.random(1, #speechPool)])
+                        AI.Mood.Happiness = math.clamp(AI.Mood.Happiness + 8, 0, 100)
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- ==========================================
+-- 10. ACTIONS
+-- ==========================================
+local Actions = {}
+
+function Actions.Initialize(AI)
+    AI.DanceStep = 1
+    AI.WaveCount = 0
+end
+
+function Actions.ProcessAction(AI, char, humanoid)
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    if AI.State == "DANCE" then Actions.Dance(AI, char, humanoid, root)
+    elseif AI.State == "WAVE" then Actions.Wave(AI, char, humanoid, root)
+    elseif AI.State == "HUG" then Actions.Hug(AI, char, humanoid, root)
+    elseif AI.State == "JUMP" then humanoid.Jump = true
+    elseif AI.State == "CLAP" then humanoid.Jump = true; task.wait(0.3)
+    elseif AI.State == "SING" then ChatHandler.Speak(AI, "🎵 Ла-ла-ла! Я пою симфонию Lua! 🎵")
+    elseif AI.State == "BACKFLIP" then humanoid.Jump = true; root.CFrame = root.CFrame * CFrame.Angles(math.rad(180), 0, 0); task.wait(0.5)
+    elseif AI.State == "SLEEP" then humanoid.Sit = true; ChatHandler.Speak(AI, "😴 Zzz..."); AI.Mood.Energy = math.clamp(AI.Mood.Energy + 5, 0, 100)
+    elseif AI.State == "COMPLIMENT" then ChatHandler.Speak(AI, "Ты просто замечательный! 🌟")
+    elseif AI.State == "PARTY" then Actions.Party(AI, char, humanoid, root)
+    elseif AI.State == "SCARED" then Actions.Scared(AI, char, humanoid, root)
+    elseif AI.State == "SURPRISE" then humanoid.Jump = true; ChatHandler.Speak(AI, "😲 Ого!")
+    elseif AI.State == "RAINBOW" then for i = 1, 7 do root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(51.4), 0); task.wait(0.1) end
+    elseif AI.State == "GIFT" then humanoid:MoveTo(root.Position); ChatHandler.Speak(AI, "🎁 Дарю тебе хорошее настроение!")
+    elseif AI.State == "COUNT" then ChatHandler.Speak(AI, "1... 2... 3... 4... 5! Готово!")
+    elseif AI.State == "SIT" then humanoid.Sit = true; AI.Mood.Energy = math.clamp(AI.Mood.Energy + 3, 0, 100)
+    elseif AI.State == "SPIN" then root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(30), 0)
+    end
+end
+
+function Actions.Dance(AI, char, humanoid, root)
+    AI.DanceStep = AI.DanceStep + 1
+    if AI.DanceStep > 5 then AI.DanceStep = 1 end
+    if AI.DanceStep == 1 then humanoid.Jump = true; root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(90), 0)
+    elseif AI.DanceStep == 2 then root.CFrame = root.CFrame + (root.CFrame.RightVector * 3); root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(-180), 0)
+    elseif AI.DanceStep == 3 then humanoid.Sit = true; task.wait(0.2); humanoid.Sit = false
+    elseif AI.DanceStep == 4 then root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(180), 0)
+    else humanoid.Jump = true; root.CFrame = root.CFrame + (root.CFrame.LookVector * 2) end
+    AI.Mood.Happiness = math.clamp(AI.Mood.Happiness + 2, 0, 100)
+end
+
+function Actions.Wave(AI, char, humanoid, root)
+    AI.WaveCount = AI.WaveCount + 1
+    root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(15 * math.sin(AI.WaveCount)), 0)
+    if AI.WaveCount >= 6 then AI.WaveCount = 0; AI.ActionTimer = 0 end
+end
+
+function Actions.Hug(AI, char, humanoid, root)
+    if not AI.HugTarget or not AI.HugTarget:FindFirstChild("HumanoidRootPart") then AI.ActionTimer = 0; return end
+    local targetRoot = AI.HugTarget.HumanoidRootPart
+    local dist = (root.Position - targetRoot.Position).Magnitude
+    if dist > 5 then humanoid:MoveTo(targetRoot.Position)
+    else humanoid:MoveTo(root.Position); TweenService:Create(root, TweenInfo.new(0.2), { CFrame = CFrame.lookAt(root.Position, targetRoot.Position) }):Play(); task.wait(0.5); AI.ActionTimer = 0; AI.HugTarget = nil end
+end
+
+function Actions.Party(AI, char, humanoid, root)
+    for i = 1, 3 do humanoid.Jump = true; task.wait(0.3); root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(60), 0) end
+end
+
+function Actions.Scared(AI, char, humanoid, root)
+    local fleeDir = -root.CFrame.LookVector
+    local fleePos = root.Position + fleeDir * 30
+    local prevWalkSpeed = humanoid.WalkSpeed
+    humanoid.WalkSpeed = 24
+    humanoid:MoveTo(fleePos); task.wait(2.0)
+    humanoid:MoveTo(root.Position); humanoid.WalkSpeed = prevWalkSpeed
+    ChatHandler.Speak(AI, "Ай, страшно! Убегаю!")
+    AI.Mood.Fear = math.clamp(AI.Mood.Fear + 20, 0, 100)
+end
+
+-- ==========================================
+-- 11. NAVIGATION
+-- ==========================================
+local Navigation = {}
+
+function Navigation.Initialize(AI)
+    AI.LastPathPosition = nil
+    AI.StuckCounter = 0
+    AI.PathRetries = 0
+end
+
+function Navigation.MoveToLocation(AI, targetPos)
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not root then return false end
+
+    if AI.LastPathPosition then
+        local movedDistance = (root.Position - AI.LastPathPosition).Magnitude
+        if movedDistance < 2 then AI.StuckCounter = AI.StuckCounter + 1 else AI.StuckCounter = 0 end
+        if AI.StuckCounter > 5 then Navigation.HandleStuck(AI, humanoid, root); AI.StuckCounter = 0; return false end
+    end
+    AI.LastPathPosition = root.Position
+
+    if Navigation.CheckAbyss(AI, char) then return false end
+
+    local path = PathfindingService:CreatePath(AI.Config.PathfindingSettings)
+    local success = pcall(function() path:ComputeAsync(root.Position, targetPos) end)
+    if not success or path.Status ~= Enum.PathStatus.Success then
+        AI.PathRetries = AI.PathRetries + 1
+        if AI.PathRetries > 3 then local altPos = Navigation.FindAlternativePosition(AI, targetPos); if altPos then path:ComputeAsync(root.Position, altPos) end end
+        return false
+    end
+    AI.PathRetries = 0
+
+    for _, waypoint in ipairs(path:GetWaypoints()) do
+        if not AI.Active or (AI.State ~= "PATROL" and AI.State ~= "FOLLOW" and AI.State ~= "EXPLORE" and AI.State ~= "GROUP_HANG") then break end
+        if Navigation.CheckAbyss(AI, char) then AI.State = "IDLE"; return false end
+        if waypoint.Action == Enum.PathWaypointAction.Jump then humanoid.Jump = true end
+        humanoid:MoveTo(waypoint.Position)
+        AI.Mood.Energy = math.clamp(AI.Mood.Energy - 0.4, 0, 100)
+        local timeout = 0
+        while timeout < 15 and (root.Position - waypoint.Position).Magnitude > 4 do
+            timeout = timeout + 1; task.wait(0.1)
+            if humanoid.MoveDirection.Magnitude == 0 then humanoid.Jump = true end
+            if Navigation.CheckAbyss(AI, char) then humanoid:MoveTo(root.Position); return false end
+        end
+    end
+    return true
+end
+
+function Navigation.CheckAbyss(AI, char)
+    local root = char:FindFirstChild("HumanoidRootPart"); if not root then return false end
+    local aheadPos = root.Position + (root.CFrame.LookVector * 4)
+    local rayOrigin = aheadPos + Vector3.new(0, 2, 0); local rayDir = Vector3.new(0, -22, 0)
+    local params = RaycastParams.new(); params.FilterDescendantsInstances = {char}; params.FilterType = Enum.RaycastFilterType.Exclude
+    if not workspace:Raycast(rayOrigin, rayDir, params) then
+        UI.AddLog("ОБРЫВ! ОСТОРОЖНО!", Color3.fromRGB(255, 50, 50))
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid then humanoid:MoveTo(root.Position - (root.CFrame.LookVector * 8)) end
+        return true
+    end
+    return false
+end
+
+function Navigation.HandleStuck(AI, humanoid, root)
+    humanoid.Jump = true; task.wait(0.5)
+    humanoid:MoveTo(root.Position - (root.CFrame.LookVector * 5)); task.wait(1)
+    humanoid:MoveTo(root.Position + (root.CFrame.RightVector * -5)); task.wait(1)
+    humanoid:MoveTo(root.Position + (root.CFrame.RightVector * 5)); task.wait(1)
+end
+
+function Navigation.FindAlternativePosition(AI, targetPos)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    local root = char.HumanoidRootPart
+    for i = 1, 20 do
+        local angle = math.random() * math.pi * 2
+        local distance = math.random(10, 50)
+        local offset = Vector3.new(math.cos(angle) * distance, 0, math.sin(angle) * distance)
+        local testPos = targetPos + offset
+        local path = PathfindingService:CreatePath(AI.Config.PathfindingSettings)
+        local success = pcall(function() path:ComputeAsync(root.Position, testPos) end)
+        if success and path.Status == Enum.PathStatus.Success then return testPos end
+    end
+    return nil
+end
+
+function Navigation.FindCrowdCenter(AI)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    for _, p1 in ipairs(Players:GetPlayers()) do
+        if p1 ~= LocalPlayer and p1.Character and p1.Character:FindFirstChild("HumanoidRootPart") then
+            local groupCount = 0; local centerSum = Vector3.new(0, 0, 0)
+            for _, p2 in ipairs(Players:GetPlayers()) do
+                if p2.Character and p2.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = (p1.Character.HumanoidRootPart.Position - p2.Character.HumanoidRootPart.Position).Magnitude
+                    if dist < AI.Config.GroupDetectionRadius then groupCount = groupCount + 1; centerSum = centerSum + p2.Character.HumanoidRootPart.Position end
+                end
+            end
+            if groupCount >= AI.Config.GroupSizeMin then
+                local crowdCenter = centerSum / groupCount
+                if (char.HumanoidRootPart.Position - crowdCenter).Magnitude < AI.Config.GroupMaxDistance then return crowdCenter end
+            end
+        end
+    end
+    return nil
+end
+
+function Navigation.Explore(AI, char, humanoid, root)
+    local interestingParts = {}
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.CanCollide then
+            local dist = (root.Position - obj.Position).Magnitude
+            if dist < 80 and dist > 10 then
+                if obj.BrickColor.Number > 0 or obj.Size.Magnitude > 10 or obj.Transparency > 0.5 then
+                    table.insert(interestingParts, obj)
+                end
+            end
+        end
+    end
+    if #interestingParts > 0 then
+        local target = interestingParts[math.random(1, #interestingParts)]
+        Navigation.MoveToLocation(AI, target.Position)
+        TweenService:Create(root, TweenInfo.new(0.5), { CFrame = CFrame.lookAt(root.Position, target.Position) }):Play()
+        if math.random(1, 2) == 1 then ChatHandler.Speak(AI, "Интересная архитектура...") end
+    else
+        Navigation.Patrol(AI, char, humanoid, root)
+    end
+end
+
+function Navigation.Patrol(AI, char, humanoid, root)
+    local randomPos = root.Position + Vector3.new(math.random(-AI.Config.WanderRadius, AI.Config.WanderRadius), 0, math.random(-AI.Config.WanderRadius, AI.Config.WanderRadius))
+    Navigation.MoveToLocation(AI, randomPos)
+end
+
+-- ==========================================
+-- 12. WORLD INTERACTION
+-- ==========================================
+local WorldInteraction = {}
+
+function WorldInteraction.Initialize(AI)
+    AI.LastInteractTime = 0
+    AI.InteractHistory = {}
+end
+
+function WorldInteraction.InteractWithEnvironment(AI)
+    if not AI.Config.WorldInteractionEnabled or tick() - AI.LastInteractTime < AI.Config.InteractCooldownTime then return false end
+    local prompt = WorldInteraction.FindNearestPrompt(AI)
+    if prompt then return WorldInteraction.ActivatePrompt(AI, prompt) end
+    local teleporter = WorldInteraction.FindTeleporter(AI)
+    if teleporter then return WorldInteraction.UseTeleporter(AI, teleporter) end
+    local vehicle = WorldInteraction.FindVehicle(AI)
+    if vehicle then return WorldInteraction.EnterVehicle(AI, vehicle) end
+    local lever = WorldInteraction.FindLever(AI)
+    if lever then return WorldInteraction.ActivateLever(AI, lever) end
+    local buttons = WorldInteraction.FindClickableButtons(AI)
+    if #buttons > 0 then return WorldInteraction.ClickButton(AI, buttons) end
+    local remote = WorldInteraction.FindSmartRemote(AI)
+    if remote then return WorldInteraction.FireRemote(AI, remote) end
+    return false
+end
+
+function WorldInteraction.FindNearestPrompt(AI)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    local root = char.HumanoidRootPart
+    local nearest, minDist = nil, AI.Config.PromptDetectionRadius
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and obj.Enabled then
+            local part = obj.Parent
+            if part and part:IsA("BasePart") then
+                local dist = (root.Position - part.Position).Magnitude
+                if dist < minDist and (not obj.RequiresLineOfSight or WorldInteraction.IsInLineOfSight(AI, part)) then
+                    minDist = dist; nearest = obj
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+function WorldInteraction.ActivatePrompt(AI, prompt)
+    pcall(function() prompt:InputHoldBegin() end)
+    AI.LastInteractTime = tick()
+    UI.AddLog("Активирован: " .. (prompt.Parent and prompt.Parent.Name or "неизвестно"), Color3.fromRGB(0, 200, 255))
+    return true
+end
+
+function WorldInteraction.FindTeleporter(AI)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    local root = char.HumanoidRootPart
+    local keywords = {"teleport", "portal", "door", "телепорт", "портал", "дверь"}
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            local name = obj.Name:lower()
+            for _, kw in ipairs(keywords) do if string.find(name, kw) and (root.Position - obj.Position).Magnitude < AI.Config.TeleporterDetectionRadius then return obj end end
+        end
+    end
+    return nil
+end
+
+function WorldInteraction.UseTeleporter(AI, teleporter)
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local root = char:FindFirstChild("HumanoidRootPart"); local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not root or not humanoid then return false end
+    Navigation.MoveToLocation(AI, teleporter.Position)
+    root.CFrame = teleporter.CFrame + Vector3.new(0, 3, 0); task.wait(0.5)
+    AI.LastInteractTime = tick()
+    UI.AddLog("Использую телепорт!", Color3.fromRGB(150, 0, 255))
+    return true
+end
+
+function WorldInteraction.FindVehicle(AI)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    local root = char.HumanoidRootPart
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if (obj:IsA("VehicleSeat") or obj:IsA("Seat")) and obj:IsA("BasePart") then
+            local dist = (root.Position - obj.Position).Magnitude
+            if dist < AI.Config.VehicleDetectionRadius and obj.Occupant == nil then return obj end
+        end
+    end
+    return nil
+end
+
+function WorldInteraction.EnterVehicle(AI, vehicle)
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return false end
+    pcall(function() vehicle:Sit(humanoid) end)
+    AI.LastInteractTime = tick()
+    AI.InVehicle = true; AI.VehicleSeat = vehicle
+    UI.AddLog("Сажусь в транспорт!", Color3.fromRGB(0, 150, 255))
+    return true
+end
+
+function WorldInteraction.FindLever(AI)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    local root = char.HumanoidRootPart
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ClickDetector") then
+            local part = obj.Parent
+            if part and part:IsA("BasePart") and (root.Position - part.Position).Magnitude < AI.Config.LeverDetectionRadius then return obj end
+        end
+    end
+    return nil
+end
+
+function WorldInteraction.ActivateLever(AI, lever)
+    pcall(function() fireclickdetector(lever) end)
+    AI.LastInteractTime = tick()
+    UI.AddLog("Активирую рычаг!", Color3.fromRGB(255, 150, 0))
+    return true
+end
+
+function WorldInteraction.FindClickableButtons(AI)
+    local buttons = {}
+    pcall(function()
+        for _, gui in ipairs(LocalPlayer.PlayerGui:GetDescendants()) do
+            if (gui:IsA("TextButton") or gui:IsA("ImageButton")) and gui.Visible and gui.Active then
+                local text = gui:IsA("TextButton") and gui.Text or ""
+                table.insert(buttons, {Object = gui, Text = text})
+            end
+        end
+    end)
+    return buttons
+end
+
+function WorldInteraction.ClickButton(AI, buttons)
+    local meaningful, keywords = {}, {"play", "start", "collect", "get", "buy", "open", "enter", "go"}
+    for _, btn in ipairs(buttons) do
+        for _, kw in ipairs(keywords) do if string.find(btn.Text:lower(), kw) then table.insert(meaningful, btn); break end end
+    end
+    if #meaningful > 0 then
+        local chosen = meaningful[math.random(1, #meaningful)]
+        pcall(function() if chosen.Object.Events and chosen.Object.Events.MouseButton1Click then chosen.Object.Events.MouseButton1Click:Fire() end end)
+        AI.LastInteractTime = tick()
+        UI.AddLog("Нажата кнопка: " .. chosen.Text, Color3.fromRGB(255, 200, 100))
+        return true
+    end
+    return false
+end
+
+function WorldInteraction.FindSmartRemote(AI)
+    for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
+        if remote:IsA("RemoteEvent") then
+            local name = remote.Name:lower()
+            if string.find(name, "collect") or string.find(name, "pickup") or string.find(name, "click") then return remote end
+        end
+    end
+    return nil
+end
+
+function WorldInteraction.FireRemote(AI, remote)
+    pcall(function() remote:FireServer() end)
+    AI.LastInteractTime = tick()
+    UI.AddLog("Отправлен ремот: " .. remote.Name, Color3.fromRGB(200, 100, 255))
+    return true
+end
+
+function WorldInteraction.IsInLineOfSight(AI, part)
+    local char = LocalPlayer.Character
+    if not char or not part then return false end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+    local rayOrigin = root.Position
+    local rayDir = (part.Position - root.Position).Unit * 100
+    local params = RaycastParams.new(); params.FilterDescendantsInstances = {char}; params.FilterType = Enum.RaycastFilterType.Exclude
+    local result = workspace:Raycast(rayOrigin, rayDir, params)
+    return result and result.Instance:IsDescendantOf(part.Parent) or false
+end
+
+function WorldInteraction.ExitVehicle(AI)
+    if AI.InVehicle and AI.VehicleSeat then
+        pcall(function() AI.VehicleSeat:Sit(nil) end)
+        AI.InVehicle = false; AI.VehicleSeat = nil
+    end
+end
+
+-- ==========================================
+-- 13. SECURITY
+-- ==========================================
+local Security = {}
+local actionHistory = {}
+
+function Security.Initialize(AI)
+    Security.StartMonitoring(AI)
+end
+
+function Security.StartMonitoring(AI)
+    task.spawn(function()
+        while AI.Active do
+            Security.CheckForAdmins(AI)
+            task.wait(math.random(10, 20))
+        end
+    end)
+end
+
+function Security.CheckForAdmins(AI)
+    for _, player in ipairs(Players:GetPlayers()) do
+        local adminKeywords = {"admin", "mod", "owner", "creator", "staff", "helper"}
+        for _, kw in ipairs(adminKeywords) do
+            if string.find(player.Name:lower(), kw) or string.find(player.DisplayName:lower(), kw) then
+                Security.OnAdminDetected(AI, player); return
+            end
+        end
+    end
+end
+
+function Security.OnAdminDetected(AI, player)
+    AI.DecisionTimer = 10
+    AI.WorldInteraction = false
+    if player.Character and LocalPlayer.Character then
+        local dist = (player.Character:GetPivot().Position - LocalPlayer.Character:GetPivot().Position).Magnitude
+        if dist < 30 then AI.State = "SIT"; AI.ActionTimer = 30 end
+    end
+end
+
+function Security.HumanizeChat(AI, text)
+    if math.random(1, 100) <= 3 then
+        local pos = math.random(1, #text)
+        local chars = "abcdefghijklmnopqrstuvwxyz"
+        text = text:sub(1, pos - 1) .. chars:sub(math.random(1, #chars), math.random(1, #chars)) .. text:sub(pos + 1)
+    end
+    task.wait(math.min(#text * 0.03, 1))
+    return text
+end
+
+function Security.CleanupTraces()
+    pcall(function() if workspace:FindFirstChild("AI_Logs") then workspace.AI_Logs:Destroy() end end)
+end
+
+-- ==========================================
+-- 14. AI CORE
+-- ==========================================
+local AI_Core = {}
+
+function AI_Core.Initialize(Config)
+    local AI = {
+        Active = false, State = "IDLE", Target = nil,
+        Mood = {}, Needs = {},
+        Memory = { RecentMessages = {}, SuccessfulActions = {}, FailedActions = {}, PlayerRelationships = {}, LearnedTriggers = {} },
+        BoredPlayers = {}, GroupHangStart = 0, InGroupHang = false, GroupHangCooldown = 0,
+        InteractCooldown = 0, ActionTimer = 0, DecisionTimer = Config.DecisionTimerDefault,
+        DanceStep = 1, WaveCount = 0, HugTarget = nil,
+        Personality = "Friendly", Config = Config
+    }
+    for k, v in pairs(Config.MoodDefaults) do AI.Mood[k] = v end
+    for k, v in pairs(Config.NeedsDefaults) do AI.Needs[k] = v end
+    local personalities = {"Friendly", "Aggressive", "Shy", "Curious", "Lazy"}
+    AI.Personality = personalities[math.random(1, #personalities)]
+    return AI
+end
+
+function AI_Core.StartMainLoop(AI)
+    task.spawn(function()
+        while task.wait(AI.Config.UpdateTick) do
+            if not AI.Active then UI.UpdateStatus("Неактивен"); continue end
+            local char = LocalPlayer.Character
+            if not char then UI.UpdateStatus("Нет персонажа"); continue end
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if not humanoid or not root then UI.UpdateStatus("Загрузка..."); continue end
+            if humanoid.Health <= 0 then
+                if AI.State ~= "DEAD" then AI.State = "DEAD"; AI.Target = nil; AI.InGroupHang = false; UI.AddLog("Респавн...", Color3.fromRGB(200, 50, 50)) end
+                continue
+            end
+            if AI.State == "DEAD" then AI.State = "IDLE"; UI.AddLog("Восстановление систем.", Color3.fromRGB(50, 255, 50)) end
+
+            Personality.Update(AI)
+            NeedsSystem.Update(AI)
+            Memory.Update(AI)
+            Relationships.Update(AI)
+            UI.UpdateAll(AI)
+
+            if AI.State == "IDLE" or AI.State == "PATROL" or AI.State == "EXPLORE" then
+                if WorldInteraction.InteractWithEnvironment(AI) then AI.DecisionTimer = 2; continue end
+            end
+
+            if AI.ActionTimer > 0 then
+                AI.ActionTimer = AI.ActionTimer - 1
+                Actions.ProcessAction(AI, char, humanoid)
+                if AI.ActionTimer <= 0 and AI.State ~= "HUG" then AI.State = "IDLE"; humanoid.Sit = false end
+                continue
+            end
+
+            if AI.State == "IDLE" then
+                humanoid.Sit = false; AI.DecisionTimer = AI.DecisionTimer - AI.Config.UpdateTick
+                if AI.DecisionTimer <= 0 then
+                    AI.DecisionTimer = math.random(3, 7)
+                    if AI.GroupHangCooldown > 0 and tick() - AI.GroupHangCooldown < AI.Config.GroupHangCooldownTime then
+                        AI.State = math.random(1, 100) <= 70 and "EXPLORE" or "PATROL"; continue
+                    end
+                    if ChatHandler.CheckNearbyVoiceChat(AI) then continue end
+                    if AI.Mood.Energy < 25 then AI.State = "SIT"; AI.ActionTimer = 25; continue end
+                    if NeedsSystem.CheckCriticalNeeds(AI) then continue end
+                    if AI.Mood.Happiness > 60 and math.random(1, 100) <= 25 then
+                        local crowdPos = Navigation.FindCrowdCenter(AI)
+                        if crowdPos and not AI.InGroupHang then
+                            local allBored = true
+                            for _, p in ipairs(Players:GetPlayers()) do
+                                if p.Character and p.Character:FindFirstChild("HumanoidRootPart") and (p.Character.HumanoidRootPart.Position - crowdPos).Magnitude < 25 and not AI.BoredPlayers[p.UserId] then
+                                    allBored = false; break
+                                end
+                            end
+                            if allBored then UI.AddLog("Эта компания мне наскучила. Ухожу.", Color3.fromRGB(255, 100, 100)); AI.State = "EXPLORE"
+                            else AI.State = "GROUP_HANG"; AI.Target = crowdPos; AI.GroupHangStart = tick(); AI.InGroupHang = true; UI.AddLog("Заметил компанию! Присоединяюсь.", Color3.fromRGB(255, 100, 255)) end
+                            continue
+                        end
+                    end
+                    local actions = {"DANCE", "JOKE", "PHILOSOPHY", "SING", "COMPLIMENT", "WAVE", "PARTY", "WEATHER", "FOOD", "PET", "MUSIC", "GAME"}
+                    local chosenAction = actions[math.random(1, #actions)]
+                    if chosenAction == "DANCE" then AI.State = "DANCE"; AI.ActionTimer = 30
+                    elseif chosenAction == "JOKE" then AI.State = "JOKE"
+                    elseif chosenAction == "PHILOSOPHY" then AI.State = "PHILOSOPHY"
+                    elseif chosenAction == "SING" then AI.State = "SING"; AI.ActionTimer = 20
+                    elseif chosenAction == "COMPLIMENT" then AI.State = "COMPLIMENT"; AI.ActionTimer = 5
+                    elseif chosenAction == "WAVE" then AI.State = "WAVE"; AI.ActionTimer = 15
+                    elseif chosenAction == "PARTY" then AI.State = "PARTY"; AI.ActionTimer = 25
+                    else
+                        local categoryMap = { WEATHER = "WeatherComments", FOOD = "FoodComments", PET = "PetReactions", MUSIC = "MusicReactions", GAME = "GameReactions" }
+                        local catName = categoryMap[chosenAction]
+                        if catName and KnowledgeBase[catName] then
+                            local resp = Personality.GetResponse(AI.Personality, KnowledgeBase[catName].Responses)
+                            if resp then ChatHandler.Speak(AI, resp) end
+                        end
+                    end
+                end
+            elseif AI.State == "GROUP_HANG" and AI.Target then
+                local dist = (root.Position - AI.Target).Magnitude
+                if dist > 10 then Navigation.MoveToLocation(AI, AI.Target)
+                else
+                    humanoid:MoveTo(root.Position)
+                    local timeInGroup = tick() - AI.GroupHangStart
+                    if timeInGroup < AI.Config.GroupHangMinDuration then
+                        if math.random(1, 100) <= 30 then
+                            local resp = Personality.GetResponse(AI.Personality, KnowledgeBase.GroupReactions.Responses)
+                            if resp then ChatHandler.Speak(AI, resp) end
+                            AI.Mood.Happiness = math.clamp(AI.Mood.Happiness + 5, 0, 100)
+                        end
+                    else
+                        if AI.Mood.Boredom > 80 or AI.Mood.Happiness < 30 then
+                            for _, p in ipairs(Players:GetPlayers()) do
+                                if p.Character and p.Character:FindFirstChild("HumanoidRootPart") and (p.Character.HumanoidRootPart.Position - AI.Target).Magnitude < 25 then
+                                    AI.BoredPlayers[p.UserId] = true
+                                end
+                            end
+                            local resp = Personality.GetResponse(AI.Personality, KnowledgeBase.GroupBoringReactions.Responses)
+                            if resp then ChatHandler.Speak(AI, resp) end
+                            UI.AddLog("Компания скучная. Ухожу.", Color3.fromRGB(200, 100, 100))
+                            AI.State = "IDLE"; AI.Target = nil; AI.InGroupHang = false; AI.GroupHangCooldown = tick()
+                        else
+                            if math.random(1, 100) <= 40 then
+                                ChatHandler.Speak(AI, "Посидел с вами, пойду дальше.")
+                                AI.State = "IDLE"; AI.Target = nil; AI.InGroupHang = false
+                            end
+                        end
+                    end
+                end
+            elseif AI.State == "JOKE" then
+                local resp = Personality.GetResponse(AI.Personality, KnowledgeBase.Jokes.Responses)
+                if resp then ChatHandler.Speak(AI, resp) end; AI.State = "IDLE"
+            elseif AI.State == "PHILOSOPHY" then
+                local resp = Personality.GetResponse(AI.Personality, KnowledgeBase.Philosophy.Responses)
+                if resp then ChatHandler.Speak(AI, resp) end; AI.State = "IDLE"
+            elseif AI.State == "EXPLORE" then Navigation.Explore(AI, char, humanoid, root); AI.State = "IDLE"
+            elseif AI.State == "FOLLOW" and AI.Target and AI.Target:FindFirstChild("HumanoidRootPart") then
+                if (root.Position - AI.Target.HumanoidRootPart.Position).Magnitude > 8 then Navigation.MoveToLocation(AI, AI.Target.HumanoidRootPart.Position) else humanoid:MoveTo(root.Position) end
+            elseif AI.State == "HELP" and AI.Target and AI.Target:FindFirstChild("HumanoidRootPart") then
+                if (root.Position - AI.Target.HumanoidRootPart.Position).Magnitude > 5 then Navigation.MoveToLocation(AI, AI.Target.HumanoidRootPart.Position) else ChatHandler.Speak(AI, "Держись, друг! Я рядом!"); AI.State = "IDLE" end
+            elseif AI.State == "PATROL" then Navigation.Patrol(AI, char, humanoid, root); AI.State = "IDLE"
+            end
+        end
+    end)
+end
+
+-- ==========================================
+-- 15. FINAL INITIALIZATION
+-- ==========================================
+local AI = AI_Core.Initialize(Config)
+AI.Modules = {
+    Config = Config, Utils = Utils, UI = UI, Personality = Personality, Memory = Memory,
+    Relationships = Relationships, NeedsSystem = NeedsSystem, KnowledgeBase = KnowledgeBase,
+    ChatHandler = ChatHandler, Actions = Actions, Navigation = Navigation,
+    WorldInteraction = WorldInteraction, Security = Security
+}
+
+UI.Create(AI)
+Personality.Initialize(AI)
+Memory.Initialize(AI)
+Relationships.Initialize(AI)
+NeedsSystem.Initialize(AI)
+Navigation.Initialize(AI)
+WorldInteraction.Initialize(AI)
+Actions.Initialize(AI)
+ChatHandler.Initialize(AI, KnowledgeBase)
+Security.Initialize(AI)
+
+AI_Core.StartMainLoop(AI)
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    AI.Target = nil; AI.State = "IDLE"; AI.InGroupHang = false; AI.InVehicle = false; AI.VehicleSeat = nil
+    AI.ActionTimer = 0; AI.DecisionTimer = Config.DecisionTimerDefault
+    UI.UpdateAll(AI)
+    UI.AddLog("Системы восстановлены. Продолжаю работу.", Color3.fromRGB(50, 255, 50))
 end)
 
-if apiKey ~= "" then
-    addMessage("System", "API ключ загружен из памяти устройства!")
-else
-    addMessage("System", "Ассистент готов! Введи API-ключ в настройках.")
-end
+UI.AddLog("╔══════════════════════════════╗", Color3.fromRGB(0, 255, 150))
+UI.AddLog("║   CORTEX V10 ЗАГРУЖЕН     ║", Color3.fromRGB(0, 255, 150))
+UI.AddLog("║   Характер: " .. Personality.GetName(AI) .. string.rep(" ", 18 - #Personality.GetName(AI)) .. "║", Personality.GetColor(AI))
+UI.AddLog("║   Модулей: 13              ║", Color3.fromRGB(0, 255, 150))
+UI.AddLog("╚══════════════════════════════╝", Color3.fromRGB(0, 255, 150))
+UI.AddLog("Нажмите кнопку для активации.", Color3.fromRGB(255, 255, 100))

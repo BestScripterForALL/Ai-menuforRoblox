@@ -1,0 +1,168 @@
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+
+local Library = {}
+Library.Theme = {
+    Background = Color3.fromRGB(10, 14, 26), -- Тёмно-синий Neverlose
+    Transparency = 0.15,
+    Accent = Color3.fromRGB(0, 170, 255),
+    Text = Color3.fromRGB(255, 255, 255),
+    Warning = Color3.fromRGB(255, 80, 80)
+}
+
+-- Глобальный ScreenGui
+local UI = Instance.new("ScreenGui")
+UI.Name = "NeverloseCustomUI"
+UI.Parent = CoreGui
+UI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Контейнер для уведомлений (слева снизу)
+local NotificationContainer = Instance.new("Frame")
+NotificationContainer.Name = "NotifContainer"
+NotificationContainer.BackgroundTransparency = 1
+NotificationContainer.Position = UDim2.new(0, 15, 1, -150)
+NotificationContainer.Size = UDim2.new(0, 250, 0, 400)
+NotificationContainer.Parent = UI
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = NotificationContainer
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+UIListLayout.Padding = UDim.new(0, 10)
+
+-- Функция создания окон
+function Library:CreateWindow(Config)
+    local WindowSettings = {
+        Name = Config.Name or "Menu",
+        KeySystem = Config.KeySystem or false,
+        DiscordAuth = Config.DiscordAuth or false
+    }
+
+    local Window = {}
+    
+    -- Мобильная кнопка открытия/закрытия меню
+    local MobileToggle = Instance.new("TextButton")
+    MobileToggle.Size = UDim2.new(0, 45, 0, 45)
+    MobileToggle.Position = UDim2.new(0.5, -22, 0, 15)
+    MobileToggle.BackgroundColor3 = Library.Theme.Accent
+    MobileToggle.Text = "NL"
+    MobileToggle.TextColor3 = Library.Theme.Text
+    MobileToggle.Font = Enum.Font.GothamBold
+    UICorner = Instance.new("UICorner", MobileToggle)
+    UICorner.CornerRadius = UDim.new(1, 0)
+    MobileToggle.Parent = UI
+
+    -- Главный фрейм меню
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Size = UDim2.new(0, 500, 0, 350)
+    MainFrame.Position = UDim2.new(0.5, -250, 0.5, -175)
+    MainFrame.BackgroundColor3 = Library.Theme.Background
+    MainFrame.BackgroundTransparency = Library.Theme.Transparency
+    MainFrame.ClipsDescendants = true
+    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
+    MainFrame.Parent = UI
+    
+    -- Анимация мобильной кнопки
+    local MenuOpen = true
+    MobileToggle.MouseButton1Click:Connect(function()
+        MenuOpen = not MenuOpen
+        local Goal = MenuOpen and UDim2.new(0.5, -250, 0.5, -175) or UDim2.new(0.5, -250, 0.5, 1000)
+        local Tween = TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = Goal})
+        Tween:Play()
+    end)
+
+    -- Контейнер для вкладок
+    local TabContainer = Instance.new("ScrollingFrame")
+    TabContainer.Size = UDim2.new(0, 120, 1, -40)
+    TabContainer.Position = UDim2.new(0, 10, 0, 30)
+    TabContainer.BackgroundTransparency = 1
+    TabContainer.Parent = MainFrame
+
+    local ElementContainer = Instance.new("Frame")
+    ElementContainer.Size = UDim2.new(1, -140, 1, -40)
+    ElementContainer.Position = UDim2.new(0, 130, 0, 30)
+    ElementContainer.BackgroundTransparency = 1
+    ElementContainer.Parent = MainFrame
+
+    -- Метод создания вкладок
+    function Window:CreateTab(TabName)
+        local Tab = {}
+        
+        -- Сюда добавляется логика переключения видимости фреймов элементов при клике на вкладку
+        local TabFrame = Instance.new("ScrollingFrame")
+        TabFrame.Size = UDim2.new(1, 0, 1, 0)
+        TabFrame.BackgroundTransparency = 1
+        TabFrame.Visible = false -- По умолчанию скрыто
+        TabFrame.Parent = ElementContainer
+        
+        local ElementLayout = Instance.new("UIListLayout")
+        ElementLayout.Padding = UDim.new(0, 8)
+        ElementLayout.Parent = TabFrame
+
+        -- Метод создания кнопки с кастомным цветом текста
+        function Tab:CreateButton(BtnConfig)
+            local Button = Instance.new("TextButton")
+            Button.Size = UDim2.new(1, -10, 0, 35)
+            Button.BackgroundColor3 = Color3.fromRGB(20, 25, 40)
+            Button.Text = BtnConfig.Name or "Button"
+            -- Кастомный цвет текста из настроек, иначе стандартный
+            Button.TextColor3 = BtnConfig.TextColor or Library.Theme.Text
+            Button.Font = Enum.Font.GothamSemibold
+            Button.TextSize = 14
+            Instance.new("UICorner", Button).CornerRadius = UDim.new(0, 4)
+            Button.Parent = TabFrame
+
+            -- Анимация нажатия
+            Button.MouseButton1Click:Connect(function()
+                local clickTween = TweenService:Create(Button, TweenInfo.new(0.1), {BackgroundColor3 = Library.Theme.Accent})
+                clickTween:Play()
+                clickTween.Completed:Wait()
+                TweenService:Create(Button, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(20, 25, 40)}):Play()
+                
+                if BtnConfig.Callback then
+                    BtnConfig.Callback()
+                end
+            end)
+        end
+        
+        -- Здесь можно добавить методы: :CreateToggle(), :CreateSlider() и т.д.
+
+        return Tab
+    end
+
+    return Window
+end
+
+-- Система уведомлений (Варнинги)
+function Library:Notify(Config)
+    local Notif = Instance.new("Frame")
+    Notif.Size = UDim2.new(1, 0, 0, 0)
+    Notif.BackgroundColor3 = Config.Type == "Warning" and Library.Theme.Warning or Library.Theme.Background
+    Notif.BackgroundTransparency = 0.2
+    Instance.new("UICorner", Notif).CornerRadius = UDim.new(0, 6)
+    Notif.Parent = NotificationContainer
+
+    local TextLabel = Instance.new("TextLabel")
+    TextLabel.Size = UDim2.new(1, -20, 1, 0)
+    TextLabel.Position = UDim2.new(0, 10, 0, 0)
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.Text = Config.Content or "Notification"
+    TextLabel.TextColor3 = Library.Theme.Text
+    TextLabel.Font = Enum.Font.Gotham
+    TextLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TextLabel.Parent = Notif
+
+    -- Анимация появления
+    TweenService:Create(Notif, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 0, 40)}):Play()
+
+    -- Авто-удаление
+    task.delay(Config.Duration or 3, function()
+        local hideTween = TweenService:Create(Notif, TweenInfo.new(0.3), {Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1})
+        hideTween:Play()
+        hideTween.Completed:Wait()
+        Notif:Destroy()
+    end)
+end
+
+return Library
